@@ -47,6 +47,10 @@ Don't encode hardware facts from chat. The stick is the source of truth: setup r
 6. **Layouts:** add "Tim's layout" once his is built (export from the app → `data/layouts/`). Subliminal / BuzZz Killer originals only with their permission (Tim will ask once the app works).
 7. Later: mini-stick mode label (mouse vs hat), print chart export, ring course as a tab, more device profiles.
 
+## Going public (target: v3.7)
+
+Repo stays private until Tim's CI and dev rules are in place. Before flipping it public: VKB photo permission (or own art), Subliminal permission for Sublight, BuzZz Killer permission if we add one. Permission emails drafted 2026-11-12.
+
 ## Open risk (Tim decided, logged)
 
 The built-in photos are VKB's product images. Shipping them in a public repo/release risks a takedown request. Mitigation options: ask VKB for permission, or replace with our own art before public launch.
