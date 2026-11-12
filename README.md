@@ -67,3 +67,13 @@ pyinstaller --onefile --windowed --name StickCitizen --add-data "stick_citizen/d
 ```
 
 Or `python run_stick_citizen.py` (editor) / `python run_stick_citizen.py --fly bindings.xml` (ring course).
+
+## Disclaimer and credits
+
+Stick Citizen is an unofficial, fan-made Star Citizen tool. It is not affiliated with or endorsed by the Cloud Imperium group of companies. Star Citizen® is a registered trademark of Cloud Imperium Rights LLC.
+
+VKB and Gladiator are trademarks of VKB. The stick photos in `stick_citizen/data/starters/` are VKB's product images and are **not** covered by this repo's MIT license.
+
+The Sublight layout is inspired by Subliminal's Enhanced dual VKB Gladiator NXT layout ([subliminal.gg](https://subliminal.gg)). It was rebuilt from scratch and is not their file.
+
+The exe isn't code-signed, so Windows SmartScreen may warn on first run. Click **More info**, then **Run anyway**.
