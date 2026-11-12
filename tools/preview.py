@@ -140,6 +140,8 @@ def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
                 pg.wait_for_timeout(150)
             snap("0-wizard-mini-stick", "window.dispatchEvent(new MouseEvent('mousemove', {movementX: 9, movementY: 3})); window.__events.push({slot: S.wiz.slot, key: 'b21', on: true}, {slot: S.wiz.slot, key: 'b21', on: false})", 500)
             snap("0-wizard-duplicate", "(() => { const f = S.capture; S.capture = null; f({slot: S.wiz.slot, key: 'b20', keys: ['b20']}); })()", 500)
+            # jump to the mini-stick's analog step ("Try again" on the duplicate prompt re-enters the loop at W.i)
+            snap("0-wizard-analog", "S.wiz.i = S.wiz.todo.findIndex(t => t.id === 'mini-stick-a2-analog-x'); document.querySelector('#wizard .wz-btns .btn').click(); setTimeout(() => window.dispatchEvent(new MouseEvent('mousemove', {movementX: 9, movementY: 3})), 300)", 700)
         else:
             snap("1-both", "S.stick='both'; S.othersOpen=true; render(); window.__events.push({slot:%s,key:'b1',on:true})" % r)
             snap("2-right", "S.stick=%s; render();" % r)

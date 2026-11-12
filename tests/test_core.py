@@ -268,3 +268,42 @@ def test_fresh_start_backs_up_old_maps_once(tmp_path, monkeypatch):
     (tmp_path / "templates" / "new.json").write_text("{}")
     assert paths.fresh_start() is False                     # only once
     assert (tmp_path / "templates" / "new.json").exists()
+
+
+def test_mini_stick_analog_mode_learns_two_axes(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    left = next(s for s in api.get_state()["sticks"] if s["side"] == "L")
+    mini = [c for c in left["controls"] if c["group"] == "Mini-stick A2"]
+    analog = [c for c in mini if c["kind"] == "axis"]
+    assert [c["id"] for c in analog] == ["mini-stick-a2-analog-x", "mini-stick-a2-analog-y"]
+    assert len([c for c in mini if c["dir"]]) == 9                       # hat mode: 8 directions + push
+    slot = left["slot"]
+    for cid, idx in (("mini-stick-a2-analog-x", 3), ("mini-stick-a2-analog-y", 4)):
+        hub.axes = {"u1": [0.0] * 6}
+        api.arm_capture(slot, "axis")
+        hub.axes = {"u1": [0.9 if i == idx else 0.0 for i in range(6)]}   # push it all the way one way
+        cap = api.poll()["captured"]
+        assert cap["key"] == f"a{idx}"
+        res = api.learn(slot, cid, cap["keys"])
+    l2 = next(s for s in res["state"]["sticks"] if s["slot"] == slot)
+    got = {c["id"]: c["inputs"].get("base") for c in l2["controls"] if c["kind"] == "axis" and c["group"] == "Mini-stick A2"}
+    assert got == {"mini-stick-a2-analog-x": "a3", "mini-stick-a2-analog-y": "a4"}
+
+
+def test_old_stick_maps_pick_up_new_builtin_controls(tmp_path, monkeypatch):
+    import json
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    name = "VKBsim Gladiator EVO L"
+    starter = templates.starter_for(name)
+    old = {"name": name, "image": "", "controls": [c for c in starter["controls"] if c.get("added", 1) == 1
+                                                   and c["id"] != "base-f1"]}    # user took F1 off ("not on my stick")
+    old["controls"][0] = dict(old["controls"][0], inputs={"base": "b20"})          # and learned something
+    (tmp_path / f"{templates._slug(name)}.json").write_text(json.dumps(old), encoding="utf-8")
+    t = templates.load_template(name)
+    ids = [c.id for c in t.controls]
+    assert "mini-stick-a2-analog-x" in ids and "mini-stick-a2-analog-y" in ids   # new in rev 2
+    assert "base-f1" not in ids                                                   # removals stay removed
+    assert t.controls[0].inputs == {"base": "b20"}                                # learning kept
+    assert t.starter_rev == 2
+    assert templates.load_template(name).starter_rev == 2                         # saved, not re-added

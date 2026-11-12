@@ -2,7 +2,7 @@
  "name": "VKB Gladiator NXT EVO SCG L",
  "match": "gladiator.*\\bl\\b",
  "image": "vkb-gladiator-nxt-evo-l.png",
- "note": "Built-in profile. Names follow VKB's SCG templates; trigger stages 1/2 are VKB defaults; other buttons are learned once with 'Set up'. Photos: VKB product images. Left stick: A2 is the switchable 8-way / mouse mini-stick (per Tim, 2026-11-12); only its hat mode reaches the app.",
+ "note": "Built-in profile. Names follow VKB's SCG templates; trigger stages 1/2 are VKB defaults; other buttons are learned once with 'Set up'. Photos: VKB product images. Left stick: A2 is the switchable 8-way / mouse mini-stick (per Tim, 2026-11-12); hat mode is learned as 8 directions + push, analog mode as two axes (both are one control).",
  "controls": [
   {
    "id": "mini-stick-a2-up",
@@ -120,6 +120,34 @@
    "inputs": {},
    "kind": "",
    "how": "Put it in 8-way hat mode (press it in to switch from mouse), then push it straight in."
+  },
+  {
+   "id": "mini-stick-a2-analog-x",
+   "label": "analog left-right",
+   "group": "Mini-stick A2",
+   "dir": "",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {},
+   "kind": "axis",
+   "how": "Switch the mini-stick to analog mode (press it in until pushing it no longer clicks or moves the pointer), then push it all the way left, then all the way right.",
+   "added": 2
+  },
+  {
+   "id": "mini-stick-a2-analog-y",
+   "label": "analog up-down",
+   "group": "Mini-stick A2",
+   "dir": "",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {},
+   "kind": "axis",
+   "how": "Switch the mini-stick to analog mode (press it in until pushing it no longer clicks or moves the pointer), then push it all the way up, then all the way down.",
+   "added": 2
   },
   {
    "id": "hat-a4-up",
@@ -452,5 +480,6 @@
    "inputs": {},
    "how": "Turn the encoder one click down."
   }
- ]
+ ],
+ "starter_rev": 2
 }

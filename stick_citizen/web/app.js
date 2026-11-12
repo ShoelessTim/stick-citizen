@@ -521,6 +521,7 @@ async function pressFlow(slot, m, layer) {
 const sideName = (stick) => (stick.side === "L" ? "left" : stick.side === "R" ? "right" : "this");
 const memberOf = (stick, id) => stick.controls.find((c) => c.id === id);
 const isMini = (g) => /mini-?stick/i.test(g.name);
+const isAnalog = (g, m) => isMini(g) && m.kind === "axis";      // the mini-stick's analog mode: two axes
 
 async function setupFlow(stick) {
   const slot = stick.slot;
@@ -543,7 +544,8 @@ async function setupFlow(stick) {
     if (got === "back") { let k = W.i - 1; while (k >= 0 && W.gone.has(W.todo[k].id)) k--; W.i = Math.max(0, k); W.note = null; continue; }
     if (got === "skip") { W.i++; W.note = null; continue; }
     if (got === "absent") {                       // not on this stick: take the whole control off the map
-      for (const x of g.members) { W.gone.add(x.id); await API.edit_control(slot, x.id, null, null, null, false, true); }
+      const drop = isAnalog(g, m) ? g.members.filter((x) => x.kind === "axis") : g.members;   // no analog mode: keep the hat
+      for (const x of drop) { W.gone.add(x.id); await API.edit_control(slot, x.id, null, null, null, false, true); }
       S.state = await API.get_state(); W.note = null; continue;
     }
     // --- a press came in ---
@@ -634,22 +636,24 @@ function wizStep(st, g, m) {
     const finish = (v) => { API.cancel_capture(); S.capture = null; resolve(v); };
     S.capture = (got) => resolve(got);
     const dirWord = m.dir === "push" ? "straight in" : m.dir;
-    const title = g.hat && m.dir ? `Push it ${dirWord}` : m.kind === "axis" ? "Move it end to end" : g.hat ? `${m.label}` : "Press it once";
+    const title = g.hat && m.dir ? `Push it ${dirWord}` : isAnalog(g, m) ? `Analog mode: ${m.label.replace(/^analog /, "")}` : m.kind === "axis" ? "Move it end to end" : g.hat ? `${m.label}` : "Press it once";
     const how = m.how || (g.hat && m.dir === "push" ? "Press the hat straight down into the stick, without tilting it."
       : g.hat && m.dir ? `Tilt the hat ${m.dir} and let go.` : "Press it and let go.");
     const right = [
       h("h2", { class: "wz-name" }, g.name),
       h("div", { class: "wz-do" }, title),
       h("p", { class: "wz-how" }, how),
-      g.hat && g.members.some((x) => x.dir) ? compass(st, g, m) : null,
+      g.hat && m.dir ? compass(st, g, m) : null,
       isMini(g) ? h("div", { class: "wz-warn", id: "wzMouse", hidden: true },
-        h("b", {}, "Your pointer just moved."), " If that was the mini-stick, it is in mouse mode. Press it straight in to switch to hat mode, then push it again.") : null,
+        h("b", {}, "Your pointer just moved."), isAnalog(g, m)
+          ? " The mini-stick is in mouse mode. Press it straight in to switch modes until moving it no longer moves the pointer or clicks, then push it again."
+          : " If that was the mini-stick, it is in mouse mode. Press it straight in to switch to hat mode, then push it again.") : null,
       W.note ? h("div", { class: "wz-note " + W.note.kind }, W.note.text) : null,
       h("div", { class: "wz-raw" }, h("span", {}, "STICK IS SENDING"), h("div", { id: "wzRaw" }, h("em", {}, "nothing yet"))),
       h("div", { class: "wz-btns" },
         h("button", { class: "btn", disabled: W.i === 0 ? true : null, onclick: () => finish("back") }, "Back"),
         h("button", { class: "btn", onclick: () => finish("skip") }, "Skip for now"),
-        h("button", { class: "btn", onclick: () => finish("absent") }, g.hat ? "My stick doesn't have this" : "Not on my stick"),
+        h("button", { class: "btn", onclick: () => finish("absent") }, isAnalog(g, m) ? "No analog mode" : g.hat ? "My stick doesn't have this" : "Not on my stick"),
         h("button", { class: "btn", onclick: () => finish("stop") }, "Stop")),
     ];
     wizShell(st, g, m, right);

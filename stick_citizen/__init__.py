@@ -1,2 +1,2 @@
 """Stick Citizen: see, edit and fly-test Star Citizen HOSAS bindings."""
-__version__ = "3.5.1"
+__version__ = "3.6.0"
