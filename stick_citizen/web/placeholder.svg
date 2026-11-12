@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 500" width="390" height="500">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2a3442"/><stop offset="1" stop-color="#151b24"/></linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3fd0ff" stop-opacity=".55"/><stop offset="1" stop-color="#3fd0ff" stop-opacity=".1"/></linearGradient>
+  </defs>
+  <g stroke="url(#rim)" stroke-width="1.5" fill="url(#body)">
+    <path d="M30 440 L360 440 L372 470 L18 470 Z"/>
+    <path d="M60 340 Q60 320 82 318 L300 318 Q330 320 334 350 L346 440 L44 440 Z"/>
+    <rect x="168" y="270" width="34" height="56" rx="6"/>
+    <path d="M150 280 Q140 210 152 150 Q160 110 150 80 L230 70 Q262 110 250 170 Q240 230 236 280 Z"/>
+    <path d="M128 40 Q130 10 180 8 L250 10 Q292 14 290 60 L282 104 Q270 128 236 130 L160 132 Q126 126 124 96 Z"/>
+  </g>
+  <g fill="#0b1018" stroke="#3fd0ff" stroke-opacity=".35">
+    <circle cx="170" cy="48" r="14"/><circle cx="226" cy="40" r="13"/><circle cx="200" cy="88" r="12"/>
+    <circle cx="256" cy="84" r="9" fill="#5a1e1e"/>
+    <rect x="96" y="380" width="22" height="16" rx="3"/><rect x="128" y="372" width="22" height="16" rx="3"/><rect x="160" y="366" width="22" height="16" rx="3"/>
+  </g>
+  <path d="M148 150 Q130 168 136 196" stroke="#7a2a2a" stroke-width="10" stroke-linecap="round" fill="none"/>
+  <text x="195" y="496" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="11" fill="#5f7d96" letter-spacing="2">GENERIC STICK · SET YOUR PHOTO IN EDIT</text>
+</svg>

@@ -1,43 +1,43 @@
-"""Device templates: the physical controls on a stick, where they sit on screen, plus an optional photo.
+"""Stick maps: the physical controls on a stick, which inputs each sends, and where it sits on the photo.
 
-VKB-style firmware reports a fixed block of button numbers (often 128) no matter how many
-physical buttons the stick has; the spare numbers are shift layers, hat-as-buttons, tempo
-pulses or simply unused. So the template lists the *physical* controls, and each control owns
-the button numbers it can send, one per layer:
+A stick reports a block of inputs (VKB: 128 button numbers, a few hats, axes), far more than it
+physically has. A stick map lists the *physical* controls:
 
 {"name": "VKBsim Gladiator EVO R", "image": "evo_r.png",
- "controls": [{"id": "trigger", "label": "Trigger", "pos": [x, y], "inputs": {"base": 1, "shift": 33}}],
- "tiles": {"a0": [x, y], "h1u": [x, y]}}
+ "controls": [
+   {"id": "trigger", "label": "Main trigger", "group": "", "dir": "",
+    "dot": [0.25, 0.22], "inputs": {"base": "b1", "shift": "b33"}},
+   {"id": "a1-up", "label": "Up", "group": "8-way hat A1", "dir": "up",
+    "dot": [0.36, 0.06], "inputs": {"base": "h1u"}}]}
 
-`tiles` keeps positions for axes (a<slot>) and hat directions (h<n><u|d|l|r>), which the device
-reports honestly. Button numbers no control owns are "other inputs": shown in a collapsed drawer,
-and only once they are bound or have actually fired.
+- Input keys: b<n> button, h<n><u|d|l|r> hat direction, a<slot> SC axis slot.
+- Layers: "base", and "shift" for the stick firmware's shift layer (a different button number).
+- dot: where the control sits on the stick picture, as fractions of its width and height.
+- group/dir: hat directions (or any set of related inputs) share one label on screen.
+
+Maps live in the per-user folder, so updating the exe never loses them.
 """
 from __future__ import annotations
 
 import json
 import re
-import sys
 from pathlib import Path
 
-TILE_W, TILE_H = 168, 44
-CONTROL_H = 62          # a control tile with a shift layer
-GAP = 8
-COLS = 4
 HAT_DIRS = {"u": "up", "d": "down", "l": "left", "r": "right"}
 LAYERS = ("base", "shift")
 
 
 def templates_dir() -> Path:
-    base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
-    return base / "templates"
+    from .paths import user_dir
+    return user_dir() / "templates"
 
 
 def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (name or "device").lower()).strip("-") or "device"
 
 
-def tile_key(kind: str, index: int, direction: str = "") -> str:
+# ----- input keys <-> binding keys (instance, kind, index, direction) -----
+def key_of(kind: str, index: int, direction: str = "") -> str:
     if kind == "button":
         return f"b{index}"
     if kind == "axis":
@@ -45,7 +45,7 @@ def tile_key(kind: str, index: int, direction: str = "") -> str:
     return f"h{index}{direction[:1]}"
 
 
-def parse_tile_key(k: str):
+def parse_key(k: str):
     if k[0] == "b":
         return "button", int(k[1:]), ""
     if k[0] == "a":
@@ -53,69 +53,70 @@ def parse_tile_key(k: str):
     return "hat", int(k[1:-1]), HAT_DIRS[k[-1]]
 
 
-def auto_layout(num_axes: int, num_hats: int, num_buttons: int = 0) -> dict:
-    """Plain grid: axes on top, hats as crosses, then (legacy) buttons."""
-    tiles = {}
-    y = 0
-    for i in range(min(num_axes, 8)):
-        tiles[f"a{i}"] = [(i % COLS) * (TILE_W + GAP), y + (i // COLS) * (TILE_H + GAP)]
-    if num_axes:
-        y += ((min(num_axes, 8) - 1) // COLS + 1) * (TILE_H + GAP) + GAP * 2
-    cross_w = 3 * TILE_W * 0.62
-    for h in range(num_hats):
-        ox = (h % 2) * (cross_w + GAP * 4)
-        oy = y + (h // 2) * (3 * (TILE_H + 4) + GAP * 2)
-        w = TILE_W * 0.62
-        tiles[f"h{h + 1}u"] = [ox + w, oy]
-        tiles[f"h{h + 1}l"] = [ox, oy + TILE_H + 4]
-        tiles[f"h{h + 1}r"] = [ox + 2 * w, oy + TILE_H + 4]
-        tiles[f"h{h + 1}d"] = [ox + w, oy + 2 * (TILE_H + 4)]
-    if num_hats:
-        y += ((num_hats - 1) // 2 + 1) * (3 * (TILE_H + 4) + GAP * 2) + GAP
-    for b in range(num_buttons):
-        tiles[f"b{b + 1}"] = [(b % COLS) * (TILE_W + GAP), y + (b // COLS) * (TILE_H + GAP)]
-    return tiles
+def bind_key(instance: int, k: str):
+    return (instance, *parse_key(k))
+
+
+def short_label(k: str) -> str:
+    kind, i, d = parse_key(k)
+    if kind == "button":
+        return f"B{i}"
+    if kind == "axis":
+        return ("X", "Y", "Z", "RotX", "RotY", "RotZ", "Slider 1", "Slider 2")[i]
+    return f"H{i} {d}"
+
+
+def _norm_key(v):
+    if isinstance(v, int) or (isinstance(v, str) and v.isdigit()):
+        return f"b{int(v)}"
+    return v if isinstance(v, str) and re.fullmatch(r"b\d+|a\d|h\d+[udlr]", v) else None
 
 
 class Control:
-    """One physical control (a button, a trigger stage, a hat push...) and the button numbers it sends."""
-
-    def __init__(self, cid: str, label: str, pos=None, inputs: dict | None = None):
+    def __init__(self, cid, label, inputs=None, group="", direction="", dot=None):
         self.id = cid
         self.label = label
-        self.pos = list(pos) if pos else None
-        self.inputs = {k: int(v) for k, v in (inputs or {}).items() if k in LAYERS and v}
+        self.group = group or ""
+        self.dir = direction or ""
+        self.dot = [float(dot[0]), float(dot[1])] if dot else None
+        self.inputs = {}
+        for layer, v in (inputs or {}).items():
+            k = _norm_key(v)
+            if layer in LAYERS and k:
+                self.inputs[layer] = k
 
-    def layer_of(self, button: int):
-        return next((layer for layer, n in self.inputs.items() if n == button), None)
+    def layer_of(self, key: str):
+        return next((layer for layer, k in self.inputs.items() if k == key), None)
 
     def to_json(self):
-        return {"id": self.id, "label": self.label, "pos": self.pos, "inputs": self.inputs}
+        return {"id": self.id, "label": self.label, "group": self.group, "dir": self.dir,
+                "dot": self.dot, "inputs": self.inputs}
 
 
 class Template:
-    def __init__(self, name: str, tiles: dict, image: str = "", path: Path | None = None,
-                 controls: list[Control] | None = None):
+    def __init__(self, name: str, image: str = "", controls=None, path: Path | None = None):
         self.name = name
-        self.tiles = tiles
         self.image = image
-        self.path = path
         self.controls: list[Control] = controls or []
+        self.path = path
 
-    # ----- controls -----
-    def claimed(self) -> set[int]:
-        return {n for c in self.controls for n in c.inputs.values()}
+    def claimed(self) -> set[str]:
+        return {k for c in self.controls for k in c.inputs.values()}
 
-    def control_for(self, button: int):
-        """(control, layer) owning this button number, or (None, None)."""
+    def control_for(self, key: str):
         for c in self.controls:
-            layer = c.layer_of(button)
+            layer = c.layer_of(key)
             if layer:
                 return c, layer
         return None, None
 
     def control(self, cid: str):
         return next((c for c in self.controls if c.id == cid), None)
+
+    def group_members(self, c: Control) -> list[Control]:
+        if not c.group:
+            return [c]
+        return [x for x in self.controls if x.group == c.group]
 
     def _new_id(self, label: str) -> str:
         base = _slug(label) or "control"
@@ -124,34 +125,22 @@ class Template:
             cid, i = f"{base}-{i}", i + 1
         return cid
 
-    def controls_top(self) -> float:
-        """Where button controls start: under the axis and hat tiles."""
-        bottoms = [y + TILE_H for _x, y in self.tiles.values()]
-        return (max(bottoms) + GAP * 3) if bottoms else 0
-
-    def next_free_pos(self):
-        taken = {tuple(c.pos) for c in self.controls if c.pos}
-        top = self.controls_top()
-        i = 0
-        while True:
-            pos = ((i % COLS) * (TILE_W + GAP), top + (i // COLS) * (CONTROL_H + GAP))
-            if pos not in taken:
-                return list(pos)
-            i += 1
-
-    def add_control(self, label: str, button: int) -> Control:
-        self.release(button)
-        c = Control(self._new_id(label), label.strip() or f"Button {button}", self.next_free_pos(), {"base": button})
+    def add_control(self, label: str, key: str, group: str = "", direction: str = "", dot=None) -> Control:
+        self.release(key)
+        if dot is None and group:
+            sib = next((x for x in self.controls if x.group == group and x.dot), None)
+            dot = sib.dot if sib else None
+        c = Control(self._new_id(f"{group} {label}" if group else label), label.strip() or short_label(key),
+                    {"base": key}, group, direction, dot or [0.5, 0.5])
         self.controls.append(c)
         return c
 
-    def set_layer(self, control: Control, layer: str, button: int):
-        self.release(button)
-        control.inputs[layer] = int(button)
+    def set_layer(self, control: Control, layer: str, key: str):
+        self.release(key)
+        control.inputs[layer] = key
 
-    def release(self, button: int):
-        """Take a button number away from whichever control owns it."""
-        c, layer = self.control_for(button)
+    def release(self, key: str):
+        c, layer = self.control_for(key)
         if c:
             del c.inputs[layer]
             if not c.inputs:
@@ -161,19 +150,14 @@ class Template:
         if control in self.controls:
             self.controls.remove(control)
 
-    # ----- files -----
-    def image_path(self):
-        if not self.image:
-            return None
-        p = Path(self.image)
-        if not p.is_absolute():
-            p = templates_dir() / p
-        return p if p.is_file() else None
+    def set_dot(self, control: Control, fx: float, fy: float):
+        """Move a control (and the rest of its group) on the picture."""
+        dot = [min(1.0, max(0.0, float(fx))), min(1.0, max(0.0, float(fy)))]
+        for c in self.group_members(control):
+            c.dot = list(dot)
 
     def to_json(self):
-        tiles = {k: v for k, v in self.tiles.items() if not k.startswith("b")}
-        return {"name": self.name, "image": self.image,
-                "controls": [c.to_json() for c in self.controls], "tiles": tiles}
+        return {"name": self.name, "image": self.image, "controls": [c.to_json() for c in self.controls]}
 
     def save(self):
         d = templates_dir()
@@ -182,43 +166,32 @@ class Template:
         self.path.write_text(json.dumps(self.to_json(), indent=1), encoding="utf-8")
 
 
-def from_json(raw: dict, device_name: str, num_axes: int, num_hats: int, path=None) -> Template:
-    tiles = auto_layout(num_axes, num_hats)
-    tiles.update({k: v for k, v in raw.get("tiles", {}).items() if not k.startswith("b")})
-    controls = [Control(c.get("id") or f"c{i}", c.get("label") or "Control", c.get("pos"), c.get("inputs"))
-                for i, c in enumerate(raw.get("controls", []))]
-    controls = [c for c in controls if c.inputs]
-    if "controls" not in raw:
-        # v2.1 templates saved a tile per button number. Keep only the ones the user actually moved
-        # off the default grid: those are the real controls they laid out over their stick.
-        old = raw.get("tiles", {})
-        bkeys = [k for k in old if k.startswith("b")]
-        if bkeys:
-            nb = max(int(k[1:]) for k in bkeys)
-            default = auto_layout(num_axes, num_hats, nb)
-            for k in sorted(bkeys, key=lambda k: int(k[1:])):
-                if [round(v) for v in old[k]] != [round(v) for v in default.get(k, [None, None])]:
-                    n = int(k[1:])
-                    controls.append(Control(f"button-{n}", f"Button {n}", old[k], {"base": n}))
-    t = Template(raw.get("name") or device_name, tiles, raw.get("image", ""), path, controls)
-    for c in t.controls:
-        if not c.pos:
-            c.pos = t.next_free_pos()
-    return t
+def from_json(raw: dict, device_name: str, path=None) -> Template:
+    controls = []
+    for i, c in enumerate(raw.get("controls", [])):
+        ctl = Control(c.get("id") or f"c{i}", c.get("label") or "Control", c.get("inputs"),
+                      c.get("group", ""), c.get("dir", ""), c.get("dot"))
+        if ctl.inputs:
+            controls.append(ctl)
+    # v2.1 tile grids ("tiles") don't carry over; their stick photo ("image") does.
+    return Template(raw.get("name") or device_name, raw.get("image", ""), controls, path)
 
 
-def load_template(device_name: str, num_axes: int, num_hats: int) -> Template:
+def load_template(device_name: str) -> Template:
     p = templates_dir() / f"{_slug(device_name)}.json"
     try:
         raw = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return Template(device_name, auto_layout(num_axes, num_hats))
-    return from_json(raw, device_name, num_axes, num_hats, p)
+        return Template(device_name)
+    return from_json(raw, device_name, p)
 
 
-def other_inputs(template: Template, bound: set[int], seen: set[int], num_buttons: int | None = None) -> list[int]:
-    """Button numbers for the drawer: not owned by a control, and either bound or seen firing."""
+def other_inputs(template: Template, bound: set[str], seen: set[str]) -> list[str]:
+    """Input keys for the "unmapped" strip: not on a control, and either bound or seen firing."""
     out = (set(bound) | set(seen)) - template.claimed()
-    if num_buttons is not None:
-        out = {n for n in out if 0 < n <= num_buttons}
-    return sorted(out)
+    out = {k for k in out if not k.startswith("a")}
+
+    def order(k):
+        kind, i, d = parse_key(k)
+        return (kind != "button", i, d)
+    return sorted(out, key=order)

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stick Citizen</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="14" cy="14" r="4" fill="currentColor"/></svg>
+      <span>STICK CITIZEN</span>
+    </div>
+    <nav class="seg pill" id="views" aria-label="View">
+      <button data-view="sticks" class="on">Sticks</button>
+      <button data-view="edit">Edit</button>
+      <button data-view="fly">Fly</button>
+    </nav>
+    <div class="right">
+      <div class="seg" id="stickTabs" role="tablist" aria-label="Stick"></div>
+      <button class="icon" id="btnOpen" title="Open bindings (actionmaps.xml or a layout)" aria-label="Open bindings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg></button>
+      <button class="icon" id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+      <button class="icon" id="btnVoice" title="Spoken callouts" aria-label="Spoken callouts">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="wave" d="M16 8a5 5 0 010 8M19 5a9 9 0 010 14"/></svg></button>
+      <button class="primary" id="btnSave">Save for Star Citizen</button>
+    </div>
+  </header>
+
+  <div class="bar">
+    <div class="modes" id="modes"><span class="lbl">MODE</span></div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <main id="stageWrap">
+    <div id="stage">
+      <svg id="lines" aria-hidden="true"></svg>
+    </div>
+    <div id="empty" class="empty" hidden></div>
+  </main>
+
+  <section id="others" class="others" hidden>
+    <button class="others-head" id="othersHead" aria-expanded="false"></button>
+    <div class="others-body" id="othersBody"></div>
+  </section>
+
+  <footer class="foot">
+    <span class="live-tag">LIVE</span>
+    <span class="live" id="live">Press anything on your sticks</span>
+    <span class="live-sub" id="liveSub"></span>
+    <div class="meters" id="meters"></div>
+  </footer>
+
+  <aside id="drawer" class="drawer" hidden></aside>
+  <div id="modal" class="modal" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

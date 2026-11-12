@@ -1,0 +1,544 @@
+"""The bridge between the Python core and the v3 screen (stick_citizen/web).
+
+`InputHub` owns pygame on its own thread and turns stick input into events.
+`Api` is what the page calls (window.pywebview.api.*): every public method returns plain JSON.
+"""
+from __future__ import annotations
+
+import base64
+import collections
+import os
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+
+from . import __version__, config as configmod
+from .actionmaps import find_actionmaps, load_profile
+from .bindings import ACTIVATION_MODES, BindingSet, load_catalog, mappings_dir
+from .callouts import spoken
+from .paths import migrate_legacy, user_dir
+from .templates import bind_key, key_of, load_template, other_inputs, parse_key, short_label
+
+MODES = [("all", "All"), ("flight", "Flight"), ("mining", "Mining"), ("salvage", "Salvage"),
+         ("turret", "Turret"), ("foot", "On foot"), ("ground", "Ground")]
+
+
+def mode_of(mapname: str) -> str:
+    m = mapname.lower()
+    if "mining" in m:
+        return "mining"
+    if "salvage" in m:
+        return "salvage"
+    if m.startswith("turret") or m == "remoterigidentitycontroller":
+        return "turret"
+    if m in ("vehicle_driver", "vehicle_general"):
+        return "ground"
+    if m.startswith(("player", "zero_gravity", "prone", "incapacitated", "tractor_beam")):
+        return "foot"
+    if m.startswith(("spaceship", "seat_", "vehicle_mfd", "lights")):
+        return "flight"
+    return "general"     # shown in every mode
+
+
+def stick_side(name: str) -> str:
+    n = (name or "").strip().lower()
+    if n.endswith(" l") or "left" in n:
+        return "L"
+    if n.endswith(" r") or "right" in n:
+        return "R"
+    return ""
+
+
+# ---------------------------------------------------------------- input
+class InputHub(threading.Thread):
+    """Reads every stick on a background thread. Events: (device uid, input key, on)."""
+
+    def __init__(self):
+        super().__init__(daemon=True, name="stick-input")
+        self.lock = threading.Lock()
+        self.devices: list[dict] = []      # {uid, name, axes, buttons, hats}
+        self.axes: dict[str, list] = {}
+        self.events = collections.deque(maxlen=512)
+        self.generation = 0
+        self.error = ""
+        self._stop = threading.Event()
+
+    def run(self):
+        os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
+        os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+        try:
+            import pygame
+            pygame.display.init()
+            pygame.joystick.init()
+        except Exception as e:  # noqa: BLE001
+            self.error = f"Couldn't start joystick input: {e}"
+            return
+        sticks, prev = {}, {}
+
+        def refresh():
+            sticks.clear()
+            for i in range(pygame.joystick.get_count()):
+                js = pygame.joystick.Joystick(i)
+                sticks[str(js.get_instance_id())] = js
+            with self.lock:
+                self.devices = [{"uid": uid, "name": js.get_name() or "Unknown device", "axes": js.get_numaxes(),
+                                 "buttons": js.get_numbuttons(), "hats": js.get_numhats()}
+                                for uid, js in sticks.items()]
+                self.generation += 1
+
+        refresh()
+        while not self._stop.is_set():
+            try:
+                changed = any(ev.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED) for ev in pygame.event.get())
+            except pygame.error:
+                changed = False
+            if changed:
+                refresh()
+            out = []
+            axes = {}
+            for uid, js in list(sticks.items()):
+                try:
+                    for n in range(js.get_numbuttons()):
+                        on = bool(js.get_button(n))
+                        k = f"b{n + 1}"
+                        if prev.get((uid, k), False) != on:
+                            prev[(uid, k)] = on
+                            out.append((uid, k, on))
+                    for h in range(js.get_numhats()):
+                        x, y = js.get_hat(h)
+                        for d, on in (("u", y > 0), ("d", y < 0), ("l", x < 0), ("r", x > 0)):
+                            k = f"h{h + 1}{d}"
+                            if prev.get((uid, k), False) != on:
+                                prev[(uid, k)] = on
+                                out.append((uid, k, on))
+                    axes[uid] = [round(js.get_axis(a), 3) for a in range(js.get_numaxes())]
+                except pygame.error:
+                    continue
+            with self.lock:
+                self.events.extend(out)
+                self.axes = axes
+            time.sleep(0.005)
+
+    def stop(self):
+        self._stop.set()
+
+    def snapshot(self):
+        with self.lock:
+            return list(self.devices), dict(self.axes), self.generation
+
+    def drain(self):
+        with self.lock:
+            out = list(self.events)
+            self.events.clear()
+        return out
+
+
+class FakeHub:
+    """Stand-in for tests and for machines with no sticks."""
+
+    def __init__(self, devices=None):
+        self.devices = devices or []
+        self.events = []
+        self.axes = {}
+        self.generation = 1
+        self.error = ""
+
+    def start(self):
+        pass
+
+    def snapshot(self):
+        return list(self.devices), dict(self.axes), self.generation
+
+    def drain(self):
+        out, self.events = self.events, []
+        return out
+
+    def press(self, uid, key, on=True):
+        self.events.append((uid, key, on))
+
+
+# ---------------------------------------------------------------- api
+class Api:
+    def __init__(self, hub=None, actionmaps=None):
+        migrate_legacy()
+        self._cfg = configmod.load()
+        self._catalog = load_catalog()
+        self._bset = BindingSet()
+        self._path = None
+        self._mtime = 0.0
+        self._hub = hub if hub is not None else InputHub()
+        self._hub.start()
+        self._gen = -1
+        self._slots: list[dict] = []
+        self._templates: dict[str, object] = {}
+        self._seen: dict[int, set] = {}
+        self._capture = None          # slot number (or 0 = any) waiting for a press
+        self._captured = None
+        self._last_reload_check = 0.0
+        self._window = None
+        self._speaker = None
+        path = actionmaps if actionmaps is not None else (self._cfg.get("actionmaps_path") or find_actionmaps())
+        if path:
+            self._load(path)
+        self._sync_slots(force=True)
+
+    # ----- internals -----
+    def _load(self, path):
+        prof = load_profile(path)
+        self._bset = BindingSet.from_profile(prof)
+        self._path = str(path)
+        self._mtime = os.path.getmtime(path)
+        self._cfg["actionmaps_path"] = self._path
+        configmod.save(self._cfg)
+
+    def _sync_slots(self, force=False):
+        devices, _axes, gen = self._hub.snapshot()
+        if gen == self._gen and not force:
+            return False
+        self._gen = gen
+        wanted = dict(self._bset.devices)                       # SC instance -> product name
+        instances = sorted(set(wanted) | {k[0] for k in self._bset.binds}) or [1, 2]
+        overrides = {int(k): v for k, v in self._cfg.get("slot_devices", {}).items()}
+        free = list(devices)
+        slots = {}
+
+        def take(pred):
+            d = next((d for d in free if pred(d)), None)
+            if d:
+                free.remove(d)
+            return d
+
+        for inst in instances:                                   # 1. manual choice, 2. product name
+            o = overrides.get(inst)
+            d = take(lambda d, o=o: o and d["name"] == o)
+            if not d and wanted.get(inst):
+                base = wanted[inst].split("{")[0].strip().lower()
+                d = take(lambda d, b=base: b and b in d["name"].lower())
+            if d:
+                slots[inst] = d
+        for inst in instances:                                   # 3. whatever is left, in order
+            if inst not in slots and free:
+                slots[inst] = free.pop(0)
+        n = max(instances) if instances else 0
+        for d in free:                                           # extra sticks get new instances
+            n += 1
+            slots[n] = d
+        connected = [i for i in sorted(slots)]
+        shown = connected if connected else instances            # no sticks: show what the file uses
+        self._slots = []
+        for inst in shown:
+            d = slots.get(inst)
+            name = d["name"] if d else (wanted.get(inst, "").split("{")[0].strip() or f"js{inst}")
+            self._slots.append({"slot": inst, "uid": d["uid"] if d else None, "name": name,
+                                "connected": bool(d), "buttons": d["buttons"] if d else None,
+                                "side": stick_side(name)})
+        sides = [s["side"] for s in self._slots]
+        if len(self._slots) == 2 and sides[0] == sides[1]:       # unknown sides: first is left
+            self._slots[0]["side"], self._slots[1]["side"] = "L", "R"
+        self._slots.sort(key=lambda s: {"L": 0, "": 1, "R": 2}[s["side"]])
+        for s in self._slots:
+            if s["connected"] and s["slot"] not in self._bset.devices:
+                self._bset.devices[s["slot"]] = s["name"]
+        return True
+
+    def _slot(self, slot):
+        return next((s for s in self._slots if s["slot"] == int(slot)), None)
+
+    def _tpl(self, slot):
+        s = self._slot(slot)
+        name = s["name"] if s else f"js{slot}"
+        if name not in self._templates:
+            self._templates[name] = load_template(name)
+        return self._templates[name]
+
+    def _bound_keys(self, slot):
+        return {key_of(k[1], k[2], k[3]) for k, v in self._bset.binds.items() if v and k[0] == int(slot)}
+
+    def _binds_json(self, slot):
+        out = {}
+        for k, lst in self._bset.binds.items():
+            if k[0] != int(slot) or not lst:
+                continue
+            out[key_of(k[1], k[2], k[3])] = [
+                {"map": b.map, "action": b.action, "label": self._catalog.label(b.map, b.action),
+                 "activation": b.activation, "mode": mode_of(b.map), "axis": self._catalog.is_axis(b.map, b.action)}
+                for b in lst]
+        return out
+
+    def _ok(self, msg="", **extra):
+        return {"ok": True, "msg": msg, "state": self.get_state(), **extra}
+
+    # ----- reads -----
+    def get_state(self):
+        self._sync_slots()
+        sticks = []
+        for s in self._slots:
+            t = self._tpl(s["slot"])
+            sticks.append({
+                **{k: s[k] for k in ("slot", "name", "connected", "side", "buttons")},
+                "has_image": self._image_path(t) is not None,
+                "controls": [c.to_json() for c in t.controls],
+                "others": other_inputs(t, self._bound_keys(s["slot"]), self._seen.get(s["slot"], set())),
+                "binds": self._binds_json(s["slot"]),
+            })
+        return {
+            "version": __version__,
+            "modes": [{"id": m, "label": lbl} for m, lbl in MODES],
+            "activations": list(ACTIVATION_MODES),
+            "layout": {"path": self._path, "name": Path(self._path).name if self._path else "New layout",
+                       "dirty": self._bset.dirty, "count": self._bset.count()},
+            "catalog": {"sc_version": self._catalog.sc_version, "actions": len(self._catalog.actions)},
+            "sticks": sticks,
+            "speech": bool(self._cfg.get("speech", True)),
+            "input_error": getattr(self._hub, "error", ""),
+        }
+
+    def poll(self):
+        """Called by the page ~60 times a second: stick events, axes, and whether to re-read state."""
+        reload = self._sync_slots()
+        now = time.time()
+        if now - self._last_reload_check > 1.0:
+            self._last_reload_check = now
+            if self._path and not self._bset.dirty:
+                try:
+                    m = os.path.getmtime(self._path)
+                except OSError:
+                    m = self._mtime
+                if m != self._mtime:
+                    self._load(self._path)
+                    reload = True
+        by_uid = {s["uid"]: s["slot"] for s in self._slots if s["uid"]}
+        events = []
+        for uid, key, on in self._hub.drain():
+            slot = by_uid.get(uid)
+            if slot is None:
+                continue
+            events.append({"slot": slot, "key": key, "on": on})
+            if on:
+                if self._capture is not None and (self._capture in (0, slot)):
+                    self._captured = {"slot": slot, "key": key}
+                    self._capture = None
+                t = self._tpl(slot)
+                if key not in t.claimed():
+                    seen = self._seen.setdefault(slot, set())
+                    if key not in seen:
+                        seen.add(key)
+                        reload = True
+        _d, axes, _g = self._hub.snapshot()
+        out = {"events": events, "axes": {s["slot"]: axes.get(s["uid"], []) for s in self._slots if s["uid"]},
+               "reload": reload}
+        if self._captured:
+            out["captured"], self._captured = self._captured, None
+        return out
+
+    @staticmethod
+    def _image_path(t):
+        if not t.image:
+            return None
+        p = Path(t.image).expanduser()
+        if not p.is_absolute():
+            p = user_dir() / "images" / p
+        return p if p.is_file() else None
+
+    def get_image(self, slot):
+        p = self._image_path(self._tpl(slot))
+        if p is None:
+            return None
+        mime = {".png": "image/png", ".webp": "image/webp"}.get(p.suffix.lower(), "image/jpeg")
+        return f"data:{mime};base64," + base64.b64encode(p.read_bytes()).decode()
+
+    def search(self, query="", mode="all", limit=80):
+        q = (query or "").strip().lower().replace("_", " ")
+        out = []
+        for a in self._catalog.actions:
+            m = mode_of(a["map"])
+            if mode not in ("all", None) and m not in (mode, "general"):
+                continue
+            hay = f"{a['label']} {a['action']} {a['group']}".lower().replace("_", " ")
+            if q and not all(w in hay for w in q.split()):
+                continue
+            where = self._bset.where(a["map"], a["action"])
+            out.append({"map": a["map"], "action": a["action"], "label": a["label"], "group": a["group"],
+                        "axis": a["axis"], "mode": m,
+                        "bound": f"js{where[0]} {short_label(key_of(*where[1:]))}" if where else ""})
+            if len(out) >= limit:
+                break
+        return out
+
+    # ----- binding edits -----
+    def assign(self, slot, key, mapname, action):
+        k = bind_key(int(slot), key)
+        old = self._bset.where(mapname, action)
+        self._bset.assign(k, mapname, action, "" if k[1] == "axis" else self._catalog.default_activation(mapname, action))
+        msg = f"{self._catalog.label(mapname, action)} → {self.input_name(slot, key)}"
+        if old and old != k:
+            msg += f" (moved from js{old[0]} {short_label(key_of(*old[1:]))})"
+        return self._ok(msg)
+
+    def remove(self, slot, key, mapname, action):
+        self._bset.remove(bind_key(int(slot), key), mapname, action)
+        return self._ok()
+
+    def set_activation(self, slot, key, mapname, action, mode):
+        self._bset.set_activation(bind_key(int(slot), key), mapname, action, mode)
+        return self._ok()
+
+    def undo(self):
+        return self._ok("Undone" if self._bset.undo() else "Nothing to undo")
+
+    def input_name(self, slot, key):
+        t = self._tpl(slot)
+        c, layer = t.control_for(key)
+        if c:
+            name = f"{c.group} {c.label}".strip() if c.group else c.label
+            return name + (" ⇧" if layer == "shift" else "")
+        return short_label(key)
+
+    # ----- stick map edits -----
+    def arm_capture(self, slot=0):
+        """The next press (on `slot`, or any stick when 0) comes back from poll() as `captured`."""
+        self._capture = int(slot)
+        self._captured = None
+        return {"ok": True}
+
+    def cancel_capture(self):
+        self._capture = None
+        return {"ok": True}
+
+    def map_control(self, slot, key, label, group="", direction="", target_id=""):
+        t = self._tpl(slot)
+        if target_id:
+            c = t.control(target_id)
+            if not c:
+                return {"ok": False, "msg": "That control is gone"}
+            t.set_layer(c, "shift", key)
+            msg = f"{c.label} ⇧ = {short_label(key)}"
+        else:
+            c = t.add_control(label, key, group, direction)
+            msg = f"{(group + ' ') if group else ''}{c.label} = {short_label(key)}"
+        t.save()
+        return self._ok(msg, control=c.id)
+
+    def set_dot(self, slot, cid, fx, fy):
+        t = self._tpl(slot)
+        c = t.control(cid)
+        if c:
+            t.set_dot(c, fx, fy)
+            t.save()
+        return {"ok": bool(c)}
+
+    def edit_control(self, slot, cid, label=None, group=None, direction=None, drop_shift=False, delete=False):
+        t = self._tpl(slot)
+        c = t.control(cid)
+        if not c:
+            return {"ok": False, "msg": "That control is gone"}
+        if delete:
+            t.remove_control(c)
+        else:
+            if label is not None:
+                c.label = label.strip() or c.label
+            if group is not None:
+                c.group = group.strip()
+            if direction is not None:
+                c.dir = direction
+            if drop_shift:
+                c.inputs.pop("shift", None)
+        t.save()
+        return self._ok()
+
+    def choose_photo(self, slot):
+        path = self._dialog("open", ("Images (*.png;*.jpg;*.jpeg;*.webp)",))
+        if not path:
+            return {"ok": False}
+        return self.set_photo(slot, path)
+
+    def set_photo(self, slot, path):
+        from .photo import cutout
+        t = self._tpl(slot)
+        d = user_dir() / "images"
+        d.mkdir(exist_ok=True)
+        name = f"{Path(t.name).stem or 'stick'}-{int(time.time())}.png".replace(" ", "_")
+        try:
+            cutout(path, d / name)
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "msg": f"Couldn't read that image: {e}"}
+        t.image = name
+        t.save()
+        return self._ok("Photo set: background removed")
+
+    # ----- files -----
+    def _dialog(self, kind, types=(), save_name=""):
+        if self._window is None:
+            return None
+        import webview
+        fd = getattr(webview, "FileDialog", None)
+        dtype = (fd.SAVE if kind == "save" else fd.OPEN) if fd else (webview.SAVE_DIALOG if kind == "save" else webview.OPEN_DIALOG)
+        start = ""
+        if kind == "save":
+            d = mappings_dir(self._cfg.get("actionmaps_path") or find_actionmaps())
+            start = str(d) if d else ""
+        r = self._window.create_file_dialog(dtype, directory=start, save_filename=save_name, file_types=types)
+        if not r:
+            return None
+        return r if isinstance(r, str) else r[0]
+
+    def open_layout(self):
+        path = self._dialog("open", ("Star Citizen bindings (*.xml)", "All files (*.*)"))
+        if not path:
+            return {"ok": False}
+        try:
+            self._load(path)
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "msg": f"Couldn't open that file: {e}"}
+        self._sync_slots(force=True)
+        return self._ok(f"Loaded {self._bset.count()} bindings")
+
+    def new_layout(self):
+        devs = dict(self._bset.devices)
+        self._bset = BindingSet("MyHOSAS")
+        self._bset.devices = devs
+        self._path = None
+        return self._ok("Blank layout")
+
+    def save_layout(self, path=None):
+        name = self._bset.name if self._bset.name not in ("", "default") else "MyHOSAS"
+        safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in name).strip("-") or "MyHOSAS"
+        path = path or self._dialog("save", ("Star Citizen layout (*.xml)",), f"layout_{safe}_exported.xml")
+        if not path:
+            return {"ok": False}
+        profile = Path(path).stem.removeprefix("layout_").removesuffix("_exported")
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(self._bset.to_xml(profile), encoding="utf-8")
+        self._bset.dirty = False
+        return self._ok(f"Saved. In Star Citizen: Options → Keybindings → Control Profiles → “{profile}”")
+
+    def fly_test(self):
+        tmp = Path(tempfile.gettempdir()) / "stick_citizen_flytest.xml"
+        tmp.write_text(self._bset.to_xml("FlyTest"), encoding="utf-8")
+        cmd = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "stick_citizen"]
+        subprocess.Popen(cmd + ["--fly", str(tmp)])
+        return {"ok": True, "msg": "Ring course launched. Esc to come back."}
+
+    # ----- voice -----
+    def say(self, action):
+        if not self._cfg.get("speech", True) or os.name != "nt":
+            return {"ok": False}
+        if self._speaker is None:
+            from .speech import Speaker
+            self._speaker = Speaker(enabled=True)
+        self._speaker.say(spoken(action))
+        return {"ok": True}
+
+    def set_speech(self, on):
+        self._cfg["speech"] = bool(on)
+        configmod.save(self._cfg)
+        return {"ok": True}
+
+    def is_dirty(self):
+        return self._bset.dirty
+
+
+__all__ = ["Api", "InputHub", "FakeHub", "mode_of", "parse_key"]

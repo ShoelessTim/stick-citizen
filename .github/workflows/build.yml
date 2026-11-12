@@ -28,7 +28,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest -q
       - name: Build
-        run: pyinstaller --onefile --windowed --name StickCitizen --add-data "stick_citizen/data;stick_citizen/data" run_stick_citizen.py
+        run: pyinstaller --onefile --windowed --name StickCitizen --add-data "stick_citizen/data;stick_citizen/data" --add-data "stick_citizen/web;stick_citizen/web" --collect-all webview run_stick_citizen.py
       - uses: actions/upload-artifact@v4
         with:
           name: StickCitizen

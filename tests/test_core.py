@@ -83,83 +83,94 @@ def test_bindingset_roundtrip(tmp_path):
 
 
 def test_templates(tmp_path, monkeypatch):
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path))
     from stick_citizen import templates
-    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
-    t = templates.load_template("VKBsim Gladiator EVO R", 6, 2)
-    assert {"a0", "h1u", "h2r"} <= set(t.tiles)
-    assert not any(k.startswith("b") for k in t.tiles)       # no button-number grid
-    trig = t.add_control("Trigger", 1)
-    t.set_layer(trig, "shift", 33)
-    t.add_control("Pinky", 5)
-    assert t.claimed() == {1, 33, 5}
-    assert t.control_for(33) == (trig, "shift")
-    t.tiles["a0"] = [500, 20]
+    t = templates.load_template("VKBsim Gladiator EVO R")
+    trig = t.add_control("Trigger", "b1")
+    t.set_layer(trig, "shift", "b33")
+    up = t.add_control("up", "h1u", "Hat A1", "up")
+    t.set_dot(up, 0.3, 0.1)
+    down = t.add_control("down", "b14", "Hat A1", "down")
+    assert down.dot == [0.3, 0.1]                          # new direction joins its group's spot
     t.save()
-    again = templates.load_template("VKBsim Gladiator EVO R", 6, 2)
-    assert again.tiles["a0"] == [500, 20]
-    assert [c.label for c in again.controls] == ["Trigger", "Pinky"]
-    assert again.control("trigger").inputs == {"base": 1, "shift": 33}
-    # re-mapping a number moves it; an emptied control disappears
-    again.set_layer(again.control("trigger"), "shift", 5)
-    assert again.control("pinky") is None and again.control_for(5)[1] == "shift"
-    assert templates.parse_tile_key("h12l") == ("hat", 12, "left")
+    again = templates.load_template("VKBsim Gladiator EVO R")
+    assert again.control("trigger").inputs == {"base": "b1", "shift": "b33"}
+    assert again.control_for("b33")[1] == "shift"
+    assert {c.dir for c in again.group_members(again.control_for("h1u")[0])} == {"up", "down"}
+    again.set_dot(again.control_for("b14")[0], 0.5, 0.5)
+    assert again.control_for("h1u")[0].dot == [0.5, 0.5]   # the whole hat moves together
+    # v2.2 maps used plain button numbers
+    old = templates.from_json({"controls": [{"id": "x", "label": "X", "inputs": {"base": 5, "shift": 37}}]}, "dev")
+    assert old.controls[0].inputs == {"base": "b5", "shift": "b37"}
+    assert templates.parse_key("h12l") == ("hat", 12, "left")
+    assert templates.other_inputs(again, bound={"b1", "b40", "a0"}, seen={"b77"}) == ["b40", "b77"]
 
 
-def test_legacy_template_keeps_only_moved_buttons(tmp_path, monkeypatch):
-    import json
-    from stick_citizen import templates
-    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
-    tiles = templates.auto_layout(6, 2, 128)        # v2.1 saved every one of these
-    tiles["b1"] = [700, 40]                         # ...but the user only dragged two
-    tiles["b3"] = [700, 100]
-    (tmp_path / "vkb.json").write_text(json.dumps({"name": "VKB", "tiles": tiles}))
-    t = templates.load_template("VKB", 6, 2)
-    assert sorted(t.claimed()) == [1, 3]
-    assert t.control_for(1)[0].pos == [700, 40]
-
-
-def test_other_inputs():
-    from stick_citizen import templates
-    t = templates.Template("x", {})
-    t.add_control("Trigger", 1)
-    # 128 reported, but only bound or seen numbers that no control owns are listed
-    assert templates.other_inputs(t, bound={1, 40}, seen={77, 200}, num_buttons=128) == [40, 77]
-    assert templates.other_inputs(t, bound=set(), seen=set(), num_buttons=128) == []
-
-
-def test_editor_smoke(tmp_path, monkeypatch):
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+def _api(tmp_path, monkeypatch, devices=None):
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path / "home"))
     monkeypatch.chdir(tmp_path)
-    from PySide6 import QtCore, QtWidgets
-    from stick_citizen import qt_app
-    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    w = qt_app.MainWindow()
-    w.load_path(str(DEMO))
-    w.assign((1, "button", 7, ""), "spaceship_missiles", "v_weapon_launch_missile")
-    assert w.bset.at((1, "button", 7, ""))[0].action == "v_weapon_launch_missile"
-    v = w.views[1]
-    assert not any(k.startswith("b") for k in v.tiles)             # no 128-button grid
-    assert 7 in v.other_tiles                                      # bound number shows in the drawer
-    # a stray number firing shows up once, an untouched one never does
-    v.button_changed(99, True)
-    assert 99 in v.other_tiles and 98 not in v.other_tiles
-    # map a control and give it a shift layer
-    t = v.template
-    trig = t.add_control("Trigger", 7)
-    t.set_layer(trig, "shift", 99)
-    t.save()
-    v.build(None)
-    assert "trigger" in v.control_tiles and 7 not in v.other_tiles and 99 not in v.other_tiles
-    tile = v.control_tiles["trigger"]
-    assert tile.h > qt_app.TILE_H and len(tile.rows()) == 2
-    assert tile.key_at(QtCore.QPointF(10, 50)) == (1, "button", 99, "")   # lower row = shift
-    assert w.input_name(v, (1, "button", 99, "")) == "Trigger ⇧"
-    w.assign((1, "button", 99, ""), "spaceship_missiles", "v_weapon_launch_missile")
-    assert w.bset.at((1, "button", 99, ""))[0].action == "v_weapon_launch_missile"
-    w.toggle_edit(True)
-    tile.setPos(400, 12)
-    v.save_positions()
-    assert v.template.control("trigger").pos == [400, 12]
-    assert (tmp_path / "templates").exists()
-    w.bset.dirty = False
-    w.close()
+    from stick_citizen.webapi import Api, FakeHub
+    hub = FakeHub(devices if devices is not None else [
+        {"uid": "u1", "name": "VKBsim Gladiator EVO L", "axes": 6, "buttons": 128, "hats": 1},
+        {"uid": "u2", "name": "VKBsim Gladiator EVO R", "axes": 6, "buttons": 128, "hats": 1}])
+    return Api(hub, actionmaps=str(DEMO)), hub
+
+
+def test_api_sticks_and_live_input(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    st = api.get_state()
+    assert [s["side"] for s in st["sticks"]] == ["L", "R"]          # only connected sticks, left first
+    assert all(s["connected"] for s in st["sticks"])
+    r = next(s for s in st["sticks"] if s["side"] == "R")
+    hub.press("u2", "b77")                                       # a spare number nobody mapped
+    out = api.poll()
+    assert out["events"] == [{"slot": r["slot"], "key": "b77", "on": True}] and out["reload"]
+    assert "b77" in next(s for s in api.get_state()["sticks"] if s["side"] == "R")["others"]
+
+
+def test_api_map_bind_save(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    slot = next(s["slot"] for s in api.get_state()["sticks"] if s["side"] == "R")
+    api.arm_capture(slot)
+    hub.press("u2", "b1")
+    assert api.poll()["captured"] == {"slot": slot, "key": "b1"}
+    res = api.map_control(slot, "b1", "Main trigger")
+    api.map_control(slot, "b33", "", "", "", res["control"])     # shift layer
+    api.set_dot(slot, res["control"], 0.25, 0.26)
+    res = api.assign(slot, "b33", "spaceship_missiles", "v_weapon_launch_missile")
+    assert "Main trigger ⇧" in res["msg"]
+    stick = next(s for s in res["state"]["sticks"] if s["slot"] == slot)
+    assert stick["controls"][0]["inputs"] == {"base": "b1", "shift": "b33"}
+    assert stick["binds"]["b33"][0]["mode"] == "flight"
+    assert "b1" not in stick["others"] and "b33" not in stick["others"]
+    hits = api.search("launch missile", "flight")
+    assert any(h["action"] == "v_weapon_launch_missile" and h["bound"] for h in hits)
+    assert all(h["mode"] in ("flight", "general") for h in api.search("", "flight", 400))
+    out = tmp_path / "layout_Test_exported.xml"
+    api.save_layout(str(out))
+    assert 'input="js%d_button33"' % slot in out.read_text() and not api.is_dirty()
+
+
+def test_api_no_sticks_shows_file_instances(tmp_path, monkeypatch):
+    api, _ = _api(tmp_path, monkeypatch, devices=[])
+    st = api.get_state()
+    assert [s["slot"] for s in st["sticks"]] == [1, 2] and not any(s["connected"] for s in st["sticks"])
+
+
+def test_mode_of():
+    from stick_citizen.webapi import mode_of
+    assert mode_of("spaceship_weapons") == "flight" and mode_of("spaceship_mining") == "mining"
+    assert mode_of("turret_movement") == "turret" and mode_of("zero_gravity_eva") == "foot"
+    assert mode_of("default") == "general"
+
+
+def test_photo_cutout(tmp_path):
+    from PIL import Image, ImageDraw
+    from stick_citizen.photo import cutout
+    im = Image.new("RGB", (400, 500), "white")
+    d = ImageDraw.Draw(im)
+    d.rectangle((150, 100, 250, 450), fill=(30, 30, 30))      # the "stick"
+    d.rectangle((10, 10, 40, 30), fill=(0, 0, 0))             # a logo in the corner
+    im.save(tmp_path / "s.jpg")
+    res = Image.open(cutout(tmp_path / "s.jpg", tmp_path / "s.png"))
+    assert res.mode == "RGBA" and abs(res.size[0] - 100) < 25 and res.size[1] > 300   # cropped to the stick, logo gone

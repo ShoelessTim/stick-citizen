@@ -1,4 +1,4 @@
-"""Entry point: the v2 editor by default, the v1 ring course with --fly [bindings.xml]."""
+"""Entry point: the v3 screen by default, the ring course with --fly [bindings.xml]."""
 from __future__ import annotations
 
 import sys
@@ -12,5 +12,5 @@ def main(argv=None):
         from .app import main as fly
         fly(path)
         return 0
-    from .qt_app import main as editor
-    return editor()
+    from .webui import main as screen
+    return screen()

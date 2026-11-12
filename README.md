@@ -22,15 +22,16 @@ It never edits SC's live `actionmaps.xml`; SC overwrites that file anyway.
 
 ## Make it look like your stick
 
-Your stick tells Windows it has a big block of buttons (VKB sticks report 128), far more than it physically has. The extras are shift layers, hats sending buttons, tempo pulses, or unused. So Stick Citizen only draws the controls you actually have:
+Stick Citizen draws your real sticks with a label on every physical control, wired to the button it sits on.
 
-1. Turn on **Map controls** and press a control on your stick. Name it (Trigger, Pinky, A2 hat push...).
-2. With that control still selected, press it again with your shift button held. Answer **Shift layer of Trigger** and it gets a second ⇧ row you can bind separately.
-3. Repeat for each control.
+1. Click **Edit**, then **Set stick photo**. Any product photo on a white background works; the background is removed for you.
+2. Click **+ Map a control** and press a control on your stick. Name it (Main trigger, Red button...). For a hat, give each direction the same group name (e.g. "8-way hat A1"); a real hat fills in its direction for you.
+3. Drag the numbered dot onto that button in the photo.
+4. Click a label to bind actions. Each control has a **base** row and a **⇧ shift** row: click *Add a shift layer* and press the control with your shift button held.
 
-Button numbers no control owns go in the collapsed **Other inputs** drawer, and only once they're bound or you've pressed them. Untouched spare numbers never show.
+The **Mode** chips (Flight, Mining, Salvage, Turret, On foot, Ground) show only the bindings for that kind of play. Inputs your stick reports that aren't on your map show in **Unmapped inputs** only once they're bound or pressed, so the 100+ spare button numbers a VKB stick reports stay out of the way.
 
-Turn on **Edit layout** to drag controls to where they sit on your stick, and **Set stick photo…** to put your own photo behind them. Each stick saves to `templates\<device name>.json` next to the exe. Share that file and anyone with the same stick gets your map and layout.
+Your stick maps, photos and settings live in `%APPDATA%\StickCitizen`, so downloading a new version never loses them.
 
 ## Shift layers and the mini-stick
 

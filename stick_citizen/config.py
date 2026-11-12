@@ -1,8 +1,7 @@
-"""Settings saved next to the .exe (or the working folder when run from source)."""
+"""Settings, saved in the per-user Stick Citizen folder (see paths.py)."""
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 DEFAULTS = {
@@ -16,8 +15,8 @@ DEFAULTS = {
 
 
 def config_path() -> Path:
-    base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
-    return base / "stick_citizen.json"
+    from .paths import user_dir
+    return user_dir() / "stick_citizen.json"
 
 
 def load() -> dict:
