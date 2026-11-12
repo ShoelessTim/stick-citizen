@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import collections
+import json
 import os
 import subprocess
 import sys
@@ -17,7 +18,7 @@ from pathlib import Path
 
 from . import __version__, config as configmod
 from .actionmaps import find_actionmaps, load_profile
-from .bindings import ACTIVATION_MODES, BindingSet, load_catalog, mappings_dir
+from .bindings import ACTIVATION_MODES, BindingSet, Bound, load_catalog, mappings_dir
 from .callouts import spoken
 from .paths import migrate_legacy, user_dir
 from .templates import bind_key, key_of, load_template, other_inputs, parse_key, short_label
@@ -590,6 +591,56 @@ class Api:
             return {"ok": False, "msg": f"Couldn't open that file: {e}"}
         self._sync_slots(force=True)
         return self._ok(f"Loaded {self._bset.count()} bindings")
+
+    # ----- starting layouts -----
+    @staticmethod
+    def _layouts_dir():
+        return Path(__file__).parent / "data" / "layouts"
+
+    def list_layouts(self):
+        out = [{"id": "blank", "name": "Blank", "description": "No joystick bindings. Build your own from scratch.", "credit": "", "for": "Any sticks"}]
+        for f in sorted(self._layouts_dir().glob("*.json")):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            out.append({k: d.get(k, "") for k in ("id", "name", "description", "credit", "for")})
+        return out
+
+    def apply_layout(self, layout_id):
+        """Start from a built-in layout. Bindings land on your learned controls; undo brings the old ones back."""
+        self._bset._snapshot()
+        self._bset.binds = {}
+        if layout_id == "blank":
+            self._bset.name = "MyHOSAS"
+            return self._ok("Blank layout. Click any label to bind.")
+        f = self._layouts_dir() / f"{layout_id}.json"
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {"ok": False, "msg": "That layout is missing"}
+        self._bset.name = d.get("name", layout_id)
+        done = waiting = 0
+        for s in self._slots:
+            side = s["side"]
+            t = self._tpl(s["slot"])
+            for cid, layers in d.get("sides", {}).get(side, {}).items():
+                c = t.control(cid)
+                for layer, v in layers.items():
+                    key = c.inputs.get(layer) if c else None
+                    if key and self._catalog.get(v[0], v[1]):
+                        self._bset.binds.setdefault(bind_key(s["slot"], key), []).append(
+                            Bound(v[0], v[1], v[2] if len(v) > 2 else self._catalog.default_activation(v[0], v[1])))
+                        done += 1
+                    else:
+                        waiting += 1
+            for slot_axis, v in d.get("axes", {}).get(side, {}).items():
+                self._bset.binds.setdefault((s["slot"], "axis", int(slot_axis), ""), []).append(Bound(v[0], v[1], ""))
+                done += 1
+        msg = f"{self._bset.name}: {done} bindings placed"
+        if waiting:
+            msg += f" · {waiting} more land once those controls are set up (run Set up, add ⇧ layers, then apply again)"
+        return self._ok(msg)
 
     def new_layout(self):
         devs = dict(self._bset.devices)

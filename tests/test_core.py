@@ -214,6 +214,22 @@ def test_setup_learns_multi_button_controls(tmp_path, monkeypatch):
     assert next(c for c in st["controls"] if c["id"] == "hat-a4-up")["inputs"] == {"base": "h1u"}
 
 
+def test_sublight_layout(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    names = [x["name"] for x in api.list_layouts()]
+    assert names[0] == "Blank" and "Sublight" in names
+    r = next(s for s in api.get_state()["sticks"] if s["side"] == "R")
+    api.learn(r["slot"], "red-button-a2", ["b3"])
+    res = api.apply_layout("sublight")
+    assert "Sublight" in res["msg"] and "more land once" in res["msg"]
+    stick = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])
+    assert stick["binds"]["b1"][0]["action"] == "v_weapon_preset_fire_guns0"     # trigger: VKB default b1
+    assert stick["binds"]["b3"][0]["action"] == "v_master_mode_cycle"            # learned red button
+    assert stick["binds"]["a5"][0]["action"] == "v_roll"
+    api.undo()
+    assert api.get_state()["layout"]["count"] > 0                                # the demo file is back
+
+
 def test_mode_of():
     from stick_citizen.webapi import mode_of
     assert mode_of("spaceship_weapons") == "flight" and mode_of("spaceship_mining") == "mining"

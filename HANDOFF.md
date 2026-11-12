@@ -1,6 +1,6 @@
 # Stick Citizen — Handoff
 
-**State (2026-11-12): v3.3.0 shipped (setup learns every input a press fires, so multi-button controls like the rapid trigger become stages automatically). v3.2.0 (versioned exe names; T1 is an axis, EN1 an encoder; left A2 is the 8-way/mouse mini-stick). v3.1.0 added built-in profiles. The cockpit screen works end to end in the preview harness; it has had one real run on Tim's PC (v3.0.0), which exposed that a fresh install started blank. v3.1.0 fixes that with built-in VKB profiles and a guided setup. Next: Tim runs setup on both sticks, then we bake his learned button numbers into the built-in profiles so nobody else has to.**
+**State (2026-11-12): v3.4.0 shipped ("Start from a layout" picker with Sublight, our own layout inspired by Subliminal's; plain-English names for common actions). v3.3.0 (setup learns every input a press fires, so multi-button controls like the rapid trigger become stages automatically). v3.2.0 (versioned exe names; T1 is an axis, EN1 an encoder; left A2 is the 8-way/mouse mini-stick). v3.1.0 added built-in profiles. The cockpit screen works end to end in the preview harness; it has had one real run on Tim's PC (v3.0.0), which exposed that a fresh install started blank. v3.1.0 fixes that with built-in VKB profiles and a guided setup. Next: Tim runs setup on both sticks, then we bake his learned button numbers into the built-in profiles so nobody else has to.**
 
 Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. This file is the engineering state.
 
@@ -16,6 +16,8 @@ Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. T
 | Photo cutout | `photo.py` | Flood-fills a light background from the edges, keeps the biggest shape (drops logos) |
 | User data | `paths.py` | `%APPDATA%\StickCitizen` (templates, images, settings); v2 files copied once |
 | Ring course | `app.py`, `sim.py` | pygame; launched by the Fly tab as `--fly <layout.xml>` |
+| Starting layouts | `data/layouts/*.json` | Bindings keyed by built-in control id + layer, plus axes by SC slot; `Api.apply_layout` places what's learned and reports the rest. Sublight = inspired by Subliminal's Enhanced (credited), base + ⇧ only |
+| Action names | `data/label_overrides.json` | Plain-English names over SC's labels |
 | Visual QA | `tools/preview.py` | Real Api + fake sticks → browser copy with a mock API → Playwright screenshots. **Run it and look before every UI release.** |
 
 ## Principle
@@ -30,7 +32,8 @@ Don't encode hardware facts from chat. The stick is the source of truth: setup r
    - Mini-stick in mouse mode sends mouse, not joystick input; the planned mode label/toast (Base Conditions) still to build.
 4. **Action catalog gaps:** `data/sc_actions.json` lacks some 4.x actions (e.g. `v_attack1_group1` weapon-group fire), so they show humanized names. Regenerate with `tools/make_catalog.py` from a current SC install.
 5. **Real Windows check of packaging:** pywebview + PyInstaller onefile (`--collect-all webview`) built in CI but only v3.0.0 has run on a real machine. Confirm WebView2, file dialogs, speech, and the Fly tab subprocess.
-6. Later: mini-stick mode label (mouse vs hat), print chart export, ring course as a tab, more device profiles.
+6. **Layouts:** add "Tim's layout" once his is built (export from the app → `data/layouts/`). Subliminal / BuzZz Killer originals only with their permission (Tim will ask once the app works).
+7. Later: mini-stick mode label (mouse vs hat), print chart export, ring course as a tab, more device profiles.
 
 ## Open risk (Tim decided, logged)
 

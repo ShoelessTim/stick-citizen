@@ -1,0 +1,495 @@
+{
+ "id": "sublight",
+ "name": "Sublight",
+ "credit": "Inspired by Subliminal's Enhanced dual VKB Gladiator NXT layout (subliminal.gg). Rebuilt from scratch for direct play, no Joystick Gremlin; base and \u21e7 layers only.",
+ "description": "Combat-ready dual-stick layout: weapons and targeting on the right, flight and power on the left.",
+ "for": "VKB Gladiator NXT EVO SCG L + R",
+ "sides": {
+  "R": {
+   "hat-a1-up": {
+    "base": [
+     "spaceship_power",
+     "v_power_throttle_up"
+    ],
+    "shift": [
+     "spaceship_power",
+     "v_power_throttle_max"
+    ]
+   },
+   "hat-a1-down": {
+    "base": [
+     "spaceship_power",
+     "v_power_throttle_down"
+    ],
+    "shift": [
+     "spaceship_power",
+     "v_power_throttle_min"
+    ]
+   },
+   "hat-a1-left": {
+    "base": [
+     "spaceship_power",
+     "v_power_toggle_weapons"
+    ]
+   },
+   "hat-a1-right": {
+    "base": [
+     "spaceship_power",
+     "v_power_toggle_shields"
+    ]
+   },
+   "hat-a1-push": {
+    "base": [
+     "spaceship_power",
+     "v_power_toggle_thrusters"
+    ]
+   },
+   "hat-a4-up": {
+    "base": [
+     "spaceship_targeting",
+     "v_target_lock_selected"
+    ],
+    "shift": [
+     "spaceship_targeting",
+     "v_target_pin_selected"
+    ]
+   },
+   "hat-a4-right": {
+    "base": [
+     "spaceship_targeting_advanced",
+     "v_target_cycle_hostile_fwd"
+    ],
+    "shift": [
+     "spaceship_targeting_advanced",
+     "v_target_cycle_attacker_fwd"
+    ]
+   },
+   "hat-a4-left": {
+    "base": [
+     "spaceship_targeting_advanced",
+     "v_target_cycle_hostile_back"
+    ],
+    "shift": [
+     "spaceship_targeting_advanced",
+     "v_target_cycle_attacker_back"
+    ]
+   },
+   "hat-a4-down": {
+    "base": [
+     "spaceship_targeting_advanced",
+     "v_target_cycle_subitem_fwd"
+    ],
+    "shift": [
+     "spaceship_targeting_advanced",
+     "v_target_cycle_subitem_back"
+    ]
+   },
+   "hat-a4-push": {
+    "base": [
+     "spaceship_targeting_advanced",
+     "v_target_cycle_hostile_reset"
+    ],
+    "shift": [
+     "spaceship_targeting",
+     "v_target_unpin_selected"
+    ]
+   },
+   "hat-a3-up": {
+    "base": [
+     "spaceship_missiles",
+     "v_weapon_increase_max_missiles"
+    ]
+   },
+   "hat-a3-down": {
+    "base": [
+     "spaceship_missiles",
+     "v_weapon_decrease_max_missiles"
+    ]
+   },
+   "hat-a3-left": {
+    "base": [
+     "spaceship_missiles",
+     "v_weapon_cycle_missile_back"
+    ]
+   },
+   "hat-a3-right": {
+    "base": [
+     "spaceship_missiles",
+     "v_weapon_cycle_missile_fwd"
+    ]
+   },
+   "hat-a3-push": {
+    "base": [
+     "spaceship_missiles",
+     "v_weapon_reset_max_missiles"
+    ]
+   },
+   "thumb-hat-c1-up": {
+    "base": [
+     "spaceship_defensive",
+     "v_shield_raise_level_forward"
+    ]
+   },
+   "thumb-hat-c1-down": {
+    "base": [
+     "spaceship_defensive",
+     "v_shield_raise_level_back"
+    ]
+   },
+   "thumb-hat-c1-left": {
+    "base": [
+     "spaceship_defensive",
+     "v_shield_raise_level_left"
+    ]
+   },
+   "thumb-hat-c1-right": {
+    "base": [
+     "spaceship_defensive",
+     "v_shield_raise_level_right"
+    ]
+   },
+   "thumb-hat-c1-push": {
+    "base": [
+     "spaceship_defensive",
+     "v_shield_reset_level"
+    ]
+   },
+   "red-button-a2": {
+    "base": [
+     "spaceship_movement",
+     "v_master_mode_cycle"
+    ],
+    "shift": [
+     "spaceship_missiles",
+     "v_weapon_bombing_toggle_desired_impact_point"
+    ]
+   },
+   "main-trigger-stage1": {
+    "base": [
+     "spaceship_weapons",
+     "v_weapon_preset_fire_guns0"
+    ],
+    "shift": [
+     "spaceship_weapons",
+     "v_weapon_preset_fire_guns1"
+    ]
+   },
+   "main-trigger-stage2": {
+    "base": [
+     "spaceship_missiles",
+     "v_weapon_launch_missile"
+    ]
+   },
+   "rapid-trigger": {
+    "base": [
+     "spaceship_defensive",
+     "v_weapon_countermeasure_decoy_launch"
+    ],
+    "shift": [
+     "spaceship_defensive",
+     "v_weapon_countermeasure_noise_launch"
+    ]
+   },
+   "rapid-trigger-stage-2": {
+    "base": [
+     "spaceship_defensive",
+     "v_weapon_countermeasure_decoy_launch_panic"
+    ]
+   },
+   "side-button-b1": {
+    "base": [
+     "spaceship_movement",
+     "v_ifcs_vector_decoupling_toggle"
+    ]
+   },
+   "pinky-d1": {
+    "base": [
+     "spaceship_target_hailing",
+     "v_target_hail"
+    ]
+   },
+   "base-f1": {
+    "base": [
+     "lights_controller",
+     "v_lights"
+    ],
+    "shift": [
+     "seat_general",
+     "v_light_amplification_toggle"
+    ]
+   },
+   "base-f2": {
+    "base": [
+     "seat_general",
+     "v_emergency_exit"
+    ],
+    "shift": [
+     "seat_general",
+     "v_eject"
+    ]
+   },
+   "base-f3": {
+    "base": [
+     "spaceship_general",
+     "v_toggle_all_portlocks"
+    ],
+    "shift": [
+     "spaceship_general",
+     "v_toggle_all_doorlocks"
+    ]
+   },
+   "switch-sw1-up": {
+    "base": [
+     "spaceship_defensive",
+     "v_weapon_countermeasure_decoy_burst_increase"
+    ]
+   },
+   "switch-sw1-down": {
+    "base": [
+     "spaceship_defensive",
+     "v_weapon_countermeasure_decoy_burst_decrease"
+    ]
+   },
+   "encoder-en1-up": {
+    "base": [
+     "spaceship_mining",
+     "v_increase_mining_throttle"
+    ]
+   },
+   "encoder-en1-down": {
+    "base": [
+     "spaceship_mining",
+     "v_decrease_mining_throttle"
+    ]
+   }
+  },
+  "L": {
+   "mini-stick-a2-up": {
+    "base": [
+     "spaceship_movement",
+     "v_ifcs_speed_limiter_up"
+    ]
+   },
+   "mini-stick-a2-down": {
+    "base": [
+     "spaceship_movement",
+     "v_ifcs_speed_limiter_down"
+    ]
+   },
+   "mini-stick-a2-right": {
+    "base": [
+     "spaceship_movement",
+     "v_strafe_trim_set_100_short"
+    ]
+   },
+   "mini-stick-a2-left": {
+    "base": [
+     "spaceship_movement",
+     "v_strafe_trim_reset_short"
+    ]
+   },
+   "mini-stick-a2-up-right": {
+    "base": [
+     "spaceship_movement",
+     "v_ifcs_speed_limiter_toggle"
+    ]
+   },
+   "mini-stick-a2-push": {
+    "base": [
+     "spaceship_movement",
+     "v_ifcs_throttle_swap_mode"
+    ]
+   },
+   "hat-a4-down": {
+    "base": [
+     "seat_general",
+     "v_view_look_behind"
+    ]
+   },
+   "hat-a4-left": {
+    "base": [
+     "spaceship_view",
+     "v_view_freelook_mode"
+    ]
+   },
+   "hat-a4-right": {
+    "base": [
+     "spaceship_view",
+     "v_view_dynamic_zoom_abs_toggle"
+    ]
+   },
+   "hat-a3-up": {
+    "base": [
+     "spaceship_general",
+     "v_flightready"
+    ],
+    "shift": [
+     "spaceship_power",
+     "v_power_toggle"
+    ]
+   },
+   "hat-a3-left": {
+    "base": [
+     "spaceship_power",
+     "v_power_toggle_weapons"
+    ]
+   },
+   "hat-a3-right": {
+    "base": [
+     "spaceship_power",
+     "v_power_toggle_shields"
+    ]
+   },
+   "hat-a3-down": {
+    "base": [
+     "spaceship_movement",
+     "v_toggle_landing_system"
+    ],
+    "shift": [
+     "spaceship_docking",
+     "v_toggle_docking_mode"
+    ]
+   },
+   "hat-a3-push": {
+    "base": [
+     "spaceship_movement",
+     "v_atc_request"
+    ]
+   },
+   "thumb-hat-c1-up": {
+    "base": [
+     "spaceship_weapons",
+     "v_weapon_staggered_fire_toggle"
+    ]
+   },
+   "thumb-hat-c1-left": {
+    "base": [
+     "spaceship_movement",
+     "v_ifcs_toggle_esp"
+    ]
+   },
+   "thumb-hat-c1-right": {
+    "base": [
+     "spaceship_weapons",
+     "v_weapon_gimbals_state_toggle"
+    ]
+   },
+   "thumb-hat-c1-push": {
+    "base": [
+     "spaceship_targeting",
+     "v_look_ahead_enable"
+    ]
+   },
+   "red-button": {
+    "base": [
+     "spaceship_movement",
+     "v_auto_precision_mode_toggle"
+    ]
+   },
+   "main-trigger-stage1": {
+    "base": [
+     "spaceship_movement",
+     "v_afterburner"
+    ]
+   },
+   "rapid-trigger": {
+    "base": [
+     "spaceship_radar",
+     "v_invoke_ping"
+    ],
+    "shift": [
+     "seat_general",
+     "v_light_amplification_toggle"
+    ]
+   },
+   "rapid-trigger-stage-2": {
+    "base": [
+     "spaceship_movement",
+     "v_space_brake"
+    ]
+   },
+   "side-button-b1": {
+    "base": [
+     "seat_general",
+     "v_operator_mode_cycle_forward"
+    ],
+    "shift": [
+     "seat_general",
+     "v_operator_mode_cycle_back"
+    ]
+   },
+   "base-f1": {
+    "base": [
+     "spaceship_quantum",
+     "v_toggle_qdrive_engagement"
+    ]
+   },
+   "base-f2": {
+    "base": [
+     "spaceship_movement",
+     "v_vtol_toggle"
+    ]
+   },
+   "base-f3": {
+    "base": [
+     "spaceship_general",
+     "v_toggle_all_doors"
+    ]
+   },
+   "switch-sw1-up": {
+    "base": [
+     "spaceship_general",
+     "v_open_all_doors"
+    ]
+   },
+   "switch-sw1-down": {
+    "base": [
+     "spaceship_general",
+     "v_close_all_doors"
+    ]
+   },
+   "encoder-en1-up": {
+    "base": [
+     "spaceship_salvage",
+     "tractor_beam_vehicle_increase_distance"
+    ]
+   },
+   "encoder-en1-down": {
+    "base": [
+     "spaceship_salvage",
+     "tractor_beam_vehicle_decrease_distance"
+    ]
+   }
+  }
+ },
+ "axes": {
+  "R": {
+   "0": [
+    "spaceship_movement",
+    "v_yaw"
+   ],
+   "1": [
+    "spaceship_movement",
+    "v_pitch"
+   ],
+   "5": [
+    "spaceship_movement",
+    "v_roll"
+   ]
+  },
+  "L": {
+   "0": [
+    "spaceship_movement",
+    "v_strafe_lateral"
+   ],
+   "1": [
+    "spaceship_movement",
+    "v_strafe_longitudinal"
+   ],
+   "5": [
+    "spaceship_movement",
+    "v_strafe_vertical"
+   ]
+  }
+ }
+}

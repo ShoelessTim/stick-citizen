@@ -58,6 +58,12 @@ class Catalog:
 def load_catalog() -> Catalog:
     try:
         raw = json.loads((DATA / "sc_actions.json").read_text(encoding="utf-8"))
+        try:   # friendlier names for the actions people bind most
+            names = json.loads((DATA / "label_overrides.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            names = {}
+        for a in raw["actions"]:
+            a["label"] = names.get(a["action"], a["label"])
         return Catalog(raw["actions"], sc_version=raw.get("sc_version", ""))
     except (OSError, ValueError, KeyError):
         return Catalog([])

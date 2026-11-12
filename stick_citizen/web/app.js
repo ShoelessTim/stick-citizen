@@ -678,7 +678,23 @@ function toast(msg) {
   toastT = setTimeout(() => (t.hidden = true), 3200);
 }
 
+async function layoutsFlow() {
+  const list = await API.list_layouts();
+  const pick = async (l) => {
+    closeModal();
+    apply(await API.apply_layout(l.id));
+  };
+  modal([h("h2", {}, "Start from a layout"),
+    h("p", {}, "Replaces your current joystick bindings. Undo brings them back."),
+    h("div", { class: "lay-list" }, list.map((l) => h("button", { class: "lay", onclick: () => pick(l) },
+      h("b", {}, l.name), h("span", {}, l.description), l.for ? h("i", {}, l.for) : null, l.credit ? h("small", {}, l.credit) : null)),
+      h("button", { class: "lay", onclick: async () => { closeModal(); const r = await API.open_layout(); S.images = {}; if (r && r.ok) await refresh(); apply(r); } },
+        h("b", {}, "From a file…"), h("span", {}, "Open an exported Star Citizen layout or your actionmaps.xml (someone else's layout works too)."))),
+    h("div", { class: "row" }, h("button", { class: "btn", onclick: closeModal }, "Cancel"))]);
+}
+
 function wire() {
+  $("#btnLayouts").onclick = layoutsFlow;
   document.querySelectorAll("#views button").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
   $("#btnSave").onclick = async () => apply(await API.save_layout());
   $("#btnOpen").onclick = async () => { const r = await API.open_layout(); S.images = {}; if (r && r.ok) await refresh(); apply(r); };

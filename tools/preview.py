@@ -68,6 +68,9 @@ def build(workdir: Path, learned=True):
     state = api.get_state()
     images = {s["name"]: api.get_image(s["slot"]) for s in state["sticks"]}
     search = api.search("", "all", 400)
+    api.apply_layout("sublight")
+    state = api.get_state()
+    state["layouts"] = api.list_layouts()
     return state, images, search
 
 
@@ -87,6 +90,7 @@ window.MOCK_API = (() => {
     edit_control: () => ok(), choose_photo: () => Promise.resolve({ ok: false }), open_layout: () => Promise.resolve({ ok: false }),
     save_layout: () => ok("Saved"), fly_test: () => ok("Ring course launched"), say: () => Promise.resolve({}),
     set_speech: () => Promise.resolve({ ok: true }),
+    list_layouts: () => Promise.resolve(F.layouts), apply_layout: () => ok("Applied"),
   };
 })();
 """
@@ -99,7 +103,7 @@ def write_site(state, images, search, site: Path):
     shutil.copytree(web, site)
     axes = {s["slot"]: [0.35, -0.2, 0, 0, 0, 0.1] for s in state["sticks"]}
     (site / "fixture.js").write_text("window.FIXTURE = " + json.dumps(
-        {"state": state, "images": images, "search": search, "axes": axes}) + ";\n" + MOCK, encoding="utf-8")
+        {"state": state, "images": images, "search": search, "axes": axes, "layouts": state.pop("layouts")}) + ";\n" + MOCK, encoding="utf-8")
     html = (site / "index.html").read_text(encoding="utf-8")
     (site / "index.html").write_text(html.replace('<script src="app.js">', '<script src="fixture.js"></script>\n<script src="app.js">'), encoding="utf-8")
 
@@ -133,6 +137,7 @@ def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
             snap("2-right", "S.stick=%s; render();" % r)
             snap("3-right-shift", "window.__events.push({slot:%s,key:'b1',on:false},{slot:%s,key:'b60',on:true})" % (r, r))
             snap("4-edit-drawer", "setView('edit'); openDrawer(%s, 'Main trigger')" % r)
+            snap("5-layouts", "closeDrawer(); setView('sticks'); S.stick='both'; render(); layoutsFlow()", 700)
         b.close()
     return shots, errors
 

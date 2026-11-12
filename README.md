@@ -26,7 +26,7 @@ The VKB Gladiator NXT EVO (left and right, SCG grip) is built in: photo, every c
 
 The first time, click **Set up left stick** (and right): each control lights up in turn and you press it, so Stick Citizen learns your stick's button numbers. Takes about two minutes per stick; **Skip** anything your grip doesn't have. The trigger's two stages are already known, and anything that sends more than one button (like the rapid trigger) is learned as stages automatically.
 
-Then click any label to bind actions. Each control has a **base** row and a **⇧ shift** row (press the control with your shift button held to add it).
+Then click the **layouts** button (four squares) to start from **Sublight** (a combat-ready dual-stick layout, inspired by Subliminal's) or from any exported layout file, or click any label to bind actions yourself. Each control has a **base** row and a **⇧ shift** row (press the control with your shift button held to add it).
 
 The **Mode** chips (Flight, Mining, Salvage, Turret, On foot, Ground) show only the bindings for that kind of play. Spare button numbers your stick reports stay out of the way in **Unmapped inputs**.
 
