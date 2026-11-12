@@ -1,9 +1,11 @@
 """Visual check of the v3 screen without Windows or sticks.
 
-Runs the real Api with fake sticks, writes a browser copy of the screen whose window.MOCK_API
-replays that state, and screenshots it with Playwright.
+Runs the real Api with fake VKB sticks (built-in profiles), writes a browser copy of the screen
+whose window.MOCK_API replays that state, and screenshots it with Playwright:
+  0-*  a brand-new user: built-in profile, nothing learned yet, and the setup walkthrough
+  1-*  after setup: learned buttons and some bindings, live presses, shift, edit drawer
 
-  python tools/preview.py --photos L.jpg R.jpg --out shots/
+  python tools/preview.py --out shots/
 """
 from __future__ import annotations
 
@@ -18,78 +20,50 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-# Sample map for a VKB Gladiator NXT EVO (R); the L stick mirrors it. Dots are fractions of the photo.
-R_MAP = [
-    ("8-way hat A1", [("up", "b12"), ("down", "b14"), ("left", "b15"), ("right", "b13")], (0.365, 0.056)),
-    ("4-way hat A4", [("up", "h1u"), ("down", "h1d"), ("left", "h1l"), ("right", "h1r")], (0.265, 0.083)),
-    ("Mini-stick C1", [("push", "b20")], (0.336, 0.133)),
-    ("Red button", [("", "b2")], (0.265, 0.178)),
-    ("Main trigger", [("", "b1")], (0.255, 0.256)),
-    ("Button A2", [("", "b3")], (0.369, 0.336)),
-    ("Button D1", [("", "b5")], (0.608, 0.506)),
-    ("Base F1", [("", "b6")], (0.680, 0.691)),
-    ("Base F3", [("", "b8")], (0.751, 0.672)),
-    ("Base F2", [("", "b7")], (0.608, 0.728)),
-    ("Encoder EN1", [("up", "b9"), ("down", "b10")], (0.837, 0.756)),
-    ("Switch SW1", [("up", "b16"), ("down", "b17")], (0.687, 0.817)),
-]
-L_DOTS = {g: (x / 696, y / 900) for g, (x, y) in {
-    "8-way hat A1": (425, 45), "4-way hat A4": (495, 75), "Mini-stick C1": (440, 120), "Red button": (490, 150),
-    "Main trigger": (510, 230), "Button A2": (425, 298), "Button D1": (270, 455), "Base F1": (220, 622),
-    "Base F3": (270, 652), "Base F2": (170, 605), "Encoder EN1": (215, 740), "Switch SW1": (110, 700)}.items()}
-SHIFT = {"b1": "b33", "b2": "b34", "b6": "b38", "b7": "b39"}
-BINDS = {  # (stick side, key): (map, action)
-    ("R", "b1"): ("spaceship_weapons", "v_weapon_staggered_fire_toggle"),
-    ("R", "b33"): ("spaceship_missiles", "v_weapon_launch_missile"),
-    ("R", "b2"): ("spaceship_movement", "v_ifcs_vector_decoupling_toggle"),
-    ("R", "h1u"): ("spaceship_targeting_advanced", "v_target_cycle_hostile_fwd"),
-    ("R", "h1d"): ("spaceship_targeting_advanced", "v_target_cycle_hostile_back"),
-    ("R", "b12"): ("spaceship_power", "v_power_toggle"),
-    ("R", "b3"): ("spaceship_movement", "v_toggle_landing_system"),
-    ("R", "b6"): ("lights_controller", "v_lights"),
-    ("R", "b7"): ("seat_general", "v_emergency_exit"),
-    ("R", "b8"): ("spaceship_general", "v_toggle_all_doorlocks"),
-    ("R", "b9"): ("spaceship_mining", "v_increase_mining_throttle"),
-    ("R", "b10"): ("spaceship_mining", "v_decrease_mining_throttle"),
-    ("R", "b20"): ("spaceship_view", "v_view_cycle_fwd"),
-    ("L", "b1"): ("spaceship_movement", "v_afterburner"),
-    ("L", "b2"): ("spaceship_movement", "v_space_brake"),
-    ("L", "b3"): ("spaceship_movement", "v_atc_request"),
-    ("L", "b6"): ("spaceship_quantum", "v_toggle_qdrive_engagement"),
-    ("L", "b7"): ("spaceship_general", "v_toggle_all_doors"),
-    ("L", "h1u"): ("spaceship_movement", "v_ifcs_speed_limiter_up"),
-    ("L", "h1d"): ("spaceship_movement", "v_ifcs_speed_limiter_down"),
-    ("L", "b12"): ("spaceship_movement", "v_ifcs_throttle_swap_mode"),
+# Sample bindings on built-in profile controls (by control id), after a fake setup run.
+BINDS = {
+    "R": {"main-trigger-stage1": ("spaceship_weapons", "v_weapon_staggered_fire_toggle"),
+          "red-button-a2": ("spaceship_missiles", "v_weapon_launch_missile"),
+          "side-button-b1": ("spaceship_movement", "v_toggle_landing_system"),
+          "hat-a4-up": ("spaceship_targeting_advanced", "v_target_cycle_hostile_fwd"),
+          "hat-a4-down": ("spaceship_targeting_advanced", "v_target_cycle_hostile_back"),
+          "hat-a1-up": ("spaceship_power", "v_power_toggle"),
+          "base-f1": ("lights_controller", "v_lights"), "base-f2": ("seat_general", "v_emergency_exit"),
+          "base-f3": ("spaceship_general", "v_toggle_all_doorlocks"),
+          "encoder-en1-up": ("spaceship_mining", "v_increase_mining_throttle"),
+          "pinky-d1": ("spaceship_movement", "v_ifcs_vector_decoupling_toggle")},
+    "L": {"main-trigger-stage1": ("spaceship_movement", "v_afterburner"),
+          "red-button-a2": ("spaceship_movement", "v_space_brake"),
+          "side-button-b1": ("spaceship_movement", "v_atc_request"),
+          "hat-a4-up": ("spaceship_movement", "v_ifcs_speed_limiter_up"),
+          "hat-a4-down": ("spaceship_movement", "v_ifcs_speed_limiter_down"),
+          "base-f1": ("spaceship_quantum", "v_toggle_qdrive_engagement"),
+          "base-f2": ("spaceship_general", "v_toggle_all_doors")},
 }
 
 
-def build(photos, workdir: Path):
+def build(workdir: Path, learned=True):
     os.environ["STICK_CITIZEN_HOME"] = str(workdir / "home")
     from stick_citizen.webapi import Api, FakeHub
     hub = FakeHub([{"uid": "L", "name": "VKBsim Gladiator EVO L", "axes": 6, "buttons": 128, "hats": 1},
                    {"uid": "R", "name": "VKBsim Gladiator EVO R", "axes": 6, "buttons": 128, "hats": 1}])
     api = Api(hub, actionmaps=str(ROOT / "samples" / "demo_actionmaps.xml"))
     by_side = {s["side"]: s["slot"] for s in api.get_state()["sticks"]}
-    for side, photo in zip("LR", photos or []):
-        if photo:
-            api.set_photo(by_side[side], photo)
-    for side in "LR":
-        slot = by_side[side]
-        for group, members, (fx, fy) in R_MAP:
-            if side == "L":
-                fx, fy = L_DOTS[group]
-            for d, key in members:
-                if len(members) > 1:
-                    r = api.map_control(slot, key, d, group, d)
-                else:
-                    r = api.map_control(slot, key, group)
-                api.set_dot(slot, r["control"], fx, fy)
-                if key in SHIFT:
-                    api.map_control(slot, SHIFT[key], "", "", "", r["control"])
-    for (side, key), (m, a) in BINDS.items():
-        if api._catalog.get(m, a):
-            api.assign(by_side[side], key, m, a)
-    hub.press("R", "b77")      # a spare number firing: lands in "Unmapped inputs"
+    if learned:   # what the one-time "Set up" walkthrough produces
+        for side, slot in by_side.items():
+            stick = next(x for x in api.get_state()["sticks"] if x["slot"] == slot)
+            n = 3
+            for cid in stick["unassigned"]:
+                api.assign_input(slot, cid, "base", f"b{n}")
+                n += 1
+            st = next(x for x in api.get_state()["sticks"] if x["slot"] == slot)
+            ids = {c["id"]: c["inputs"].get("base") for c in st["controls"]}
+            api.assign_input(slot, "main-trigger-stage1", "shift", "b60")
+            for cid, (m, a) in BINDS[side].items():
+                if ids.get(cid) and api._catalog.get(m, a):
+                    api.assign(slot, ids[cid], m, a)
+            api.assign(slot, "b60", "spaceship_missiles", "v_weapon_launch_missile")
+    hub.press("R", "b120")
     api.poll()
     state = api.get_state()
     images = {s["name"]: api.get_image(s["slot"]) for s in state["sticks"]}
@@ -109,8 +83,8 @@ window.MOCK_API = (() => {
     search: (q) => Promise.resolve(F.search.filter(a => !q || (a.label + a.group).toLowerCase().includes(q.toLowerCase())).slice(0, 80)),
     assign: () => ok("Bound"), remove: () => ok(), set_activation: () => ok(), undo: () => ok("Undone"),
     arm_capture: () => Promise.resolve({ ok: true }), cancel_capture: () => Promise.resolve({ ok: true }),
-    map_control: () => ok("Mapped"), set_dot: () => Promise.resolve({ ok: true }), edit_control: () => ok(),
-    choose_photo: () => Promise.resolve({ ok: false }), open_layout: () => Promise.resolve({ ok: false }),
+    map_control: () => ok("Mapped"), assign_input: () => ok("Learned"), set_dot: () => Promise.resolve({ ok: true }),
+    edit_control: () => ok(), choose_photo: () => Promise.resolve({ ok: false }), open_layout: () => Promise.resolve({ ok: false }),
     save_layout: () => ok("Saved"), fly_test: () => ok("Ring course launched"), say: () => Promise.resolve({}),
     set_speech: () => Promise.resolve({ ok: true }),
   };
@@ -130,14 +104,13 @@ def write_site(state, images, search, site: Path):
     (site / "index.html").write_text(html.replace('<script src="app.js">', '<script src="fixture.js"></script>\n<script src="app.js">'), encoding="utf-8")
 
 
-def shoot(site: Path, out: Path, size=(1600, 940)):
+def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
     from playwright.sync_api import sync_playwright
     out.mkdir(parents=True, exist_ok=True)
-    shots = []
+    shots, errors = [], []
     with sync_playwright() as p:
         b = p.chromium.launch()
         pg = b.new_page(viewport={"width": size[0], "height": size[1]})
-        errors = []
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.on("console", lambda m: m.type == "error" and errors.append(m.text))
         pg.goto((site / "index.html").as_uri())
@@ -152,28 +125,33 @@ def shoot(site: Path, out: Path, size=(1600, 940)):
             shots.append(f)
 
         r = "S.state.sticks.find(s => s.side === 'R').slot"
-        snap("1-both", "S.stick='both'; S.othersOpen=true; render(); window.__events.push({slot:%s,key:'b1',on:true})" % r)
-        snap("2-right", "S.stick=%s; render();" % r)
-        snap("3-right-shift", "window.__events.push({slot:%s,key:'b1',on:false},{slot:%s,key:'b33',on:true})" % (r, r))
-        snap("4-mining", "S.mode='mining'; render();")
-        snap("5-edit-drawer", "S.mode='flight'; setView('edit'); openDrawer(%s, '#' + S.state.sticks.find(s=>s.side==='R').controls.find(c=>c.label==='Main trigger').id)" % r)
-        snap("6-hat-drawer", "openDrawer(%s, '8-way hat A1'); S.sel.adding = S.state.sticks.find(s=>s.side==='R').controls.find(c=>c.group==='8-way hat A1' && c.dir==='left').inputs.base; renderDrawer();" % r)
+        if fresh:
+            snap("0-fresh-both", "S.stick='both'; render();")
+            snap("0-fresh-setup", "setTimeout(() => setupFlow(S.state.sticks.find(s => s.side === 'R')), 0)", 900)
+        else:
+            snap("1-both", "S.stick='both'; S.othersOpen=true; render(); window.__events.push({slot:%s,key:'b1',on:true})" % r)
+            snap("2-right", "S.stick=%s; render();" % r)
+            snap("3-right-shift", "window.__events.push({slot:%s,key:'b1',on:false},{slot:%s,key:'b60',on:true})" % (r, r))
+            snap("4-edit-drawer", "setView('edit'); openDrawer(%s, 'Main trigger')" % r)
         b.close()
     return shots, errors
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--photos", nargs=2, default=None, help="left and right stick photos")
     ap.add_argument("--out", default="shots")
     ap.add_argument("--width", type=int, default=1600)
     ap.add_argument("--height", type=int, default=940)
     a = ap.parse_args()
-    work = Path(tempfile.mkdtemp(prefix="sc-preview-"))
-    st, im, se = build(a.photos, work)
-    write_site(st, im, se, work / "site")
-    files, errs = shoot(work / "site", Path(a.out), (a.width, a.height))
-    print("\n".join(map(str, files)))
-    if errs:
-        print("PAGE ERRORS:\n" + "\n".join(errs))
+    allfiles, allerrs = [], []
+    for fresh in (True, False):
+        work = Path(tempfile.mkdtemp(prefix="sc-preview-"))
+        st, im, se = build(work, learned=not fresh)
+        write_site(st, im, se, work / "site")
+        files, errs = shoot(work / "site", Path(a.out), (a.width, a.height), fresh)
+        allfiles += files
+        allerrs += errs
+    print("\n".join(map(str, allfiles)))
+    if allerrs:
+        print("PAGE ERRORS:\n" + "\n".join(allerrs))
         sys.exit(1)

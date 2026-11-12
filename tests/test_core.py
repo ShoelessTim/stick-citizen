@@ -85,7 +85,7 @@ def test_bindingset_roundtrip(tmp_path):
 def test_templates(tmp_path, monkeypatch):
     monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path))
     from stick_citizen import templates
-    t = templates.load_template("VKBsim Gladiator EVO R")
+    t = templates.load_template("Test Stick R2")
     trig = t.add_control("Trigger", "b1")
     t.set_layer(trig, "shift", "b33")
     up = t.add_control("up", "h1u", "Hat A1", "up")
@@ -93,7 +93,7 @@ def test_templates(tmp_path, monkeypatch):
     down = t.add_control("down", "b14", "Hat A1", "down")
     assert down.dot == [0.3, 0.1]                          # new direction joins its group's spot
     t.save()
-    again = templates.load_template("VKBsim Gladiator EVO R")
+    again = templates.load_template("Test Stick R2")
     assert again.control("trigger").inputs == {"base": "b1", "shift": "b33"}
     assert again.control_for("b33")[1] == "shift"
     assert {c.dir for c in again.group_members(again.control_for("h1u")[0])} == {"up", "down"}
@@ -134,13 +134,14 @@ def test_api_map_bind_save(tmp_path, monkeypatch):
     api.arm_capture(slot)
     hub.press("u2", "b1")
     assert api.poll()["captured"] == {"slot": slot, "key": "b1"}
-    res = api.map_control(slot, "b1", "Main trigger")
-    api.map_control(slot, "b33", "", "", "", res["control"])     # shift layer
-    api.set_dot(slot, res["control"], 0.25, 0.26)
+    res = api.map_control(slot, "b1", "My trigger")
+    cid = res["control"]
+    api.map_control(slot, "b33", "", "", "", cid)                # shift layer
+    api.set_dot(slot, cid, 0.25, 0.26)
     res = api.assign(slot, "b33", "spaceship_missiles", "v_weapon_launch_missile")
-    assert "Main trigger ⇧" in res["msg"]
+    assert "My trigger ⇧" in res["msg"]
     stick = next(s for s in res["state"]["sticks"] if s["slot"] == slot)
-    assert stick["controls"][0]["inputs"] == {"base": "b1", "shift": "b33"}
+    assert next(c for c in stick["controls"] if c["id"] == cid)["inputs"] == {"base": "b1", "shift": "b33"}
     assert stick["binds"]["b33"][0]["mode"] == "flight"
     assert "b1" not in stick["others"] and "b33" not in stick["others"]
     hits = api.search("launch missile", "flight")
@@ -155,6 +156,26 @@ def test_api_no_sticks_shows_file_instances(tmp_path, monkeypatch):
     api, _ = _api(tmp_path, monkeypatch, devices=[])
     st = api.get_state()
     assert [s["slot"] for s in st["sticks"]] == [1, 2] and not any(s["connected"] for s in st["sticks"])
+
+
+def test_builtin_vkb_profile(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    st = api.get_state()
+    r = next(s for s in st["sticks"] if s["side"] == "R")
+    assert r["has_image"] and api.get_image(r["slot"]).startswith("data:image/png")   # bundled photo
+    groups = {c["group"] or c["label"] for c in r["controls"]}
+    assert {"Main trigger", "Hat A1", "Red button A2", "Pinky D1", "Base F1"} <= groups
+    trig = [c for c in r["controls"] if c["group"] == "Main trigger"]
+    assert [c["inputs"].get("base") for c in trig] == ["b1", "b2"]                  # VKB default stages
+    assert len(r["unassigned"]) > 20
+    cid = r["unassigned"][0]
+    res = api.assign_input(r["slot"], cid, "base", "b30")
+    r2 = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])
+    assert cid not in r2["unassigned"]
+    # learning persists across restarts
+    api2, _ = _api(tmp_path, monkeypatch)
+    r3 = next(s for s in api2.get_state()["sticks"] if s["side"] == "R")
+    assert cid not in r3["unassigned"]
 
 
 def test_mode_of():

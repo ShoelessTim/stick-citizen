@@ -1,0 +1,397 @@
+{
+ "name": "VKB Gladiator NXT EVO SCG L",
+ "match": "gladiator.*\\bl\\b",
+ "image": "vkb-gladiator-nxt-evo-l.png",
+ "note": "Built-in profile. Names follow VKB's SCG templates; trigger stages 1/2 are VKB defaults; other buttons are learned once with 'Set up'. Photos: VKB product images.",
+ "controls": [
+  {
+   "id": "hat-a1-up",
+   "label": "up",
+   "group": "Hat A1",
+   "dir": "up",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a1-right",
+   "label": "right",
+   "group": "Hat A1",
+   "dir": "right",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a1-down",
+   "label": "down",
+   "group": "Hat A1",
+   "dir": "down",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a1-left",
+   "label": "left",
+   "group": "Hat A1",
+   "dir": "left",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a1-push",
+   "label": "push",
+   "group": "Hat A1",
+   "dir": "push",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a4-up",
+   "label": "up",
+   "group": "Hat A4",
+   "dir": "up",
+   "dot": [
+    0.611,
+    0.05
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a4-right",
+   "label": "right",
+   "group": "Hat A4",
+   "dir": "right",
+   "dot": [
+    0.611,
+    0.05
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a4-down",
+   "label": "down",
+   "group": "Hat A4",
+   "dir": "down",
+   "dot": [
+    0.611,
+    0.05
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a4-left",
+   "label": "left",
+   "group": "Hat A4",
+   "dir": "left",
+   "dot": [
+    0.611,
+    0.05
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a4-push",
+   "label": "push",
+   "group": "Hat A4",
+   "dir": "push",
+   "dot": [
+    0.611,
+    0.05
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a3-up",
+   "label": "up",
+   "group": "Hat A3",
+   "dir": "up",
+   "dot": [
+    0.632,
+    0.133
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a3-right",
+   "label": "right",
+   "group": "Hat A3",
+   "dir": "right",
+   "dot": [
+    0.632,
+    0.133
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a3-down",
+   "label": "down",
+   "group": "Hat A3",
+   "dir": "down",
+   "dot": [
+    0.632,
+    0.133
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a3-left",
+   "label": "left",
+   "group": "Hat A3",
+   "dir": "left",
+   "dot": [
+    0.632,
+    0.133
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "hat-a3-push",
+   "label": "push",
+   "group": "Hat A3",
+   "dir": "push",
+   "dot": [
+    0.632,
+    0.133
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "thumb-hat-c1-up",
+   "label": "up",
+   "group": "Thumb hat C1",
+   "dir": "up",
+   "dot": [
+    0.769,
+    0.122
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "thumb-hat-c1-right",
+   "label": "right",
+   "group": "Thumb hat C1",
+   "dir": "right",
+   "dot": [
+    0.769,
+    0.122
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "thumb-hat-c1-down",
+   "label": "down",
+   "group": "Thumb hat C1",
+   "dir": "down",
+   "dot": [
+    0.769,
+    0.122
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "thumb-hat-c1-left",
+   "label": "left",
+   "group": "Thumb hat C1",
+   "dir": "left",
+   "dot": [
+    0.769,
+    0.122
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "thumb-hat-c1-push",
+   "label": "push",
+   "group": "Thumb hat C1",
+   "dir": "push",
+   "dot": [
+    0.769,
+    0.122
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "red-button-a2",
+   "label": "Red button A2",
+   "group": "",
+   "dir": "",
+   "dot": [
+    0.704,
+    0.167
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "main-trigger-stage1",
+   "label": "stage 1",
+   "group": "Main trigger",
+   "dir": "",
+   "dot": [
+    0.733,
+    0.256
+   ],
+   "inputs": {
+    "base": "b1"
+   }
+  },
+  {
+   "id": "main-trigger-stage2",
+   "label": "stage 2",
+   "group": "Main trigger",
+   "dir": "",
+   "dot": [
+    0.733,
+    0.256
+   ],
+   "inputs": {
+    "base": "b2"
+   }
+  },
+  {
+   "id": "rapid-trigger",
+   "label": "Rapid trigger",
+   "group": "",
+   "dir": "",
+   "dot": [
+    0.75,
+    0.291
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "side-button-b1",
+   "label": "Side button B1",
+   "group": "",
+   "dir": "",
+   "dot": [
+    0.611,
+    0.331
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "pinky-d1",
+   "label": "Pinky D1",
+   "group": "",
+   "dir": "",
+   "dot": [
+    0.388,
+    0.506
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "base-f1",
+   "label": "Base F1",
+   "group": "",
+   "dir": "",
+   "dot": [
+    0.316,
+    0.691
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "base-f2",
+   "label": "Base F2",
+   "group": "",
+   "dir": "",
+   "dot": [
+    0.244,
+    0.672
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "base-f3",
+   "label": "Base F3",
+   "group": "",
+   "dir": "",
+   "dot": [
+    0.388,
+    0.724
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "switch-sw1-up",
+   "label": "up",
+   "group": "Switch SW1",
+   "dir": "up",
+   "dot": [
+    0.158,
+    0.778
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "switch-sw1-down",
+   "label": "down",
+   "group": "Switch SW1",
+   "dir": "down",
+   "dot": [
+    0.158,
+    0.778
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "wheel-t1-up",
+   "label": "up",
+   "group": "Wheel T1",
+   "dir": "up",
+   "dot": [
+    0.23,
+    0.794
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "wheel-t1-down",
+   "label": "down",
+   "group": "Wheel T1",
+   "dir": "down",
+   "dot": [
+    0.23,
+    0.794
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "encoder-en1-up",
+   "label": "up",
+   "group": "Encoder EN1",
+   "dir": "up",
+   "dot": [
+    0.309,
+    0.822
+   ],
+   "inputs": {}
+  },
+  {
+   "id": "encoder-en1-down",
+   "label": "down",
+   "group": "Encoder EN1",
+   "dir": "down",
+   "dot": [
+    0.309,
+    0.822
+   ],
+   "inputs": {}
+  }
+ ]
+}

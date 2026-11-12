@@ -97,6 +97,7 @@ class Template:
     def __init__(self, name: str, image: str = "", controls=None, path: Path | None = None):
         self.name = name
         self.image = image
+        self.starter_image = None       # built-in profile photo, used when the user hasn't set one
         self.controls: list[Control] = controls or []
         self.path = path
 
@@ -140,11 +141,13 @@ class Template:
         control.inputs[layer] = key
 
     def release(self, key: str):
+        """Take an input off whichever control has it (the control stays, waiting for a press)."""
         c, layer = self.control_for(key)
         if c:
             del c.inputs[layer]
-            if not c.inputs:
-                self.controls.remove(c)
+
+    def unassigned(self) -> list[Control]:
+        return [c for c in self.controls if "base" not in c.inputs]
 
     def remove_control(self, control: Control):
         if control in self.controls:
@@ -171,19 +174,39 @@ def from_json(raw: dict, device_name: str, path=None) -> Template:
     for i, c in enumerate(raw.get("controls", [])):
         ctl = Control(c.get("id") or f"c{i}", c.get("label") or "Control", c.get("inputs"),
                       c.get("group", ""), c.get("dir", ""), c.get("dot"))
-        if ctl.inputs:
-            controls.append(ctl)
-    # v2.1 tile grids ("tiles") don't carry over; their stick photo ("image") does.
-    return Template(raw.get("name") or device_name, raw.get("image", ""), controls, path)
+        controls.append(ctl)
+    # v2 files ("tiles") carry nothing over: the built-in profile replaces their grid and photo.
+    image = "" if "tiles" in raw else raw.get("image", "")
+    return Template(raw.get("name") or device_name, image, controls, path)
+
+
+def starter_for(device_name: str):
+    """A bundled starter map (labels + positions, no button numbers) for a known stick, if any."""
+    d = Path(__file__).parent / "data" / "starters"
+    for f in sorted(d.glob("*.json")) if d.is_dir() else []:
+        try:
+            raw = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if raw.get("match") and re.search(raw["match"], (device_name or "").lower()):
+            return raw
+    return None
 
 
 def load_template(device_name: str) -> Template:
     p = templates_dir() / f"{_slug(device_name)}.json"
     try:
-        raw = json.loads(p.read_text(encoding="utf-8"))
+        t = from_json(json.loads(p.read_text(encoding="utf-8")), device_name, p)
     except (OSError, ValueError):
-        return Template(device_name)
-    return from_json(raw, device_name, p)
+        t = Template(device_name, path=p)
+    st = starter_for(device_name)
+    if st:
+        if not t.controls:                   # new stick, or a v2 file
+            t.controls = from_json(st, device_name).controls
+        img = Path(__file__).parent / "data" / "starters" / st.get("image", "")
+        if st.get("image") and img.is_file():
+            t.starter_image = img
+    return t
 
 
 def other_inputs(template: Template, bound: set[str], seen: set[str]) -> list[str]:

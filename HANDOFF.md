@@ -1,0 +1,39 @@
+# Stick Citizen — Handoff
+
+**State (2026-11-12): v3.1.0 shipped. The cockpit screen works end to end in the preview harness; it has had one real run on Tim's PC (v3.0.0), which exposed that a fresh install started blank. v3.1.0 fixes that with built-in VKB profiles and a guided setup. Next: Tim runs setup on both sticks, then we bake his learned button numbers into the built-in profiles so nobody else has to.**
+
+Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. This file is the engineering state.
+
+## What exists
+
+| Piece | Where | Notes |
+|---|---|---|
+| Screen | `stick_citizen/web/` (index.html, app.css, app.js) | Vanilla JS, no build step. Cockpit look: Bahnschrift / Cascadia Mono, cyan live, amber shift |
+| Window | `webui.py` | pywebview (Edge WebView2 on Windows), js_api = `webapi.Api` |
+| Bridge | `webapi.py` | `Api` (every public method returns JSON), `InputHub` (pygame on its own thread), `FakeHub` for tests |
+| Stick maps | `templates.py` | Controls = physical controls; inputs per layer (`base`, `shift`); hats grouped by `group`/`dir`; `dot` = position on the photo (0–1) |
+| Built-in profiles | `data/starters/*.json` + `.png` | VKB Gladiator NXT EVO SCG L/R. Names from VKB's SCG templates. Only trigger stage 1/2 (b1/b2) have numbers |
+| Photo cutout | `photo.py` | Flood-fills a light background from the edges, keeps the biggest shape (drops logos) |
+| User data | `paths.py` | `%APPDATA%\StickCitizen` (templates, images, settings); v2 files copied once |
+| Ring course | `app.py`, `sim.py` | pygame; launched by the Fly tab as `--fly <layout.xml>` |
+| Visual QA | `tools/preview.py` | Real Api + fake sticks → browser copy with a mock API → Playwright screenshots. **Run it and look before every UI release.** |
+
+## Next steps (in order)
+
+1. **Tim: run Set up on both sticks** (v3.1.0). Watch for: dots that sit off their button, controls the SCG Standard grip doesn't have, hats that report as POV hats (h1u…) vs buttons.
+2. **Bake defaults:** copy Tim's learned `inputs` from `%APPDATA%\StickCitizen\templates\vkbsim-gladiator-evo-*.json` into `data/starters/*.json` (keep labels and dots). Then setup is only for people who changed their VKB config. Add a "Use VKB defaults / Re-learn" choice.
+3. **Fix dot positions** from Tim's screenshots (the hats on the head are best guesses; C1 position especially).
+4. **Action catalog gaps:** `data/sc_actions.json` lacks some 4.x actions (e.g. `v_attack1_group1` weapon-group fire), so they show humanized names. Regenerate with `tools/make_catalog.py` from a current SC install.
+5. **Real Windows check of packaging:** pywebview + PyInstaller onefile (`--collect-all webview`) built in CI but only v3.0.0 has run on a real machine. Confirm WebView2, file dialogs, speech, and the Fly tab subprocess.
+6. Later: mini-stick mode label (mouse vs hat), print chart export, ring course as a tab, more device profiles.
+
+## Open risk (Tim decided, logged)
+
+The built-in photos are VKB's product images. Shipping them in a public repo/release risks a takedown request. Mitigation options: ask VKB for permission, or replace with our own art before public launch.
+
+## How to work on it
+
+- Tests: `SDL_VIDEODRIVER=dummy python -m pytest -q` (no Qt, no window needed)
+- Look at it: `python tools/preview.py --out shots/` then open the PNGs
+- Release: bump `stick_citizen/__init__.py` `__version__`, push to main → CI tests, builds `StickCitizen.exe`, cuts a GitHub release
+- Repo: github.com/ShoelessTim/stick-citizen (moved from lowercase `shoelesstim`)

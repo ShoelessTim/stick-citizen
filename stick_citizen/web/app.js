@@ -37,7 +37,7 @@ const shown = () => {
   return [stickBySlot(S.stick) || all.find((s) => s.side === "R") || all[0]];
 };
 const inMode = (b) => S.mode === "all" || b.mode === S.mode || b.mode === "general";
-const bindsFor = (stick, key) => (stick.binds[key] || []).filter(inMode);
+const bindsFor = (stick, key) => (key ? stick.binds[key] || [] : []).filter(inMode);
 const shortKey = (k) => (k[0] === "b" ? "B" + k.slice(1) : k[0] === "h" ? `H${k.slice(1, -1)}${DIR_ARROW[HAT_DIR[k.slice(-1)]]}` : k.toUpperCase());
 const tagFor = (act) => (/hold/.test(act || "") ? "HOLD" : /double/.test(act || "") ? "2×" : "");
 
@@ -66,7 +66,14 @@ function summary(stick, g) {
     if (base.length) { if (!main) main = { m, b: base[0], more: base.length - 1 }; else extra++; }
     if (sh.length && !shift) shift = { m, b: sh[0] };
   }
-  return { main, extra, shift };
+  const unset = g.members.every((m) => !m.inputs.base);
+  return { main, extra, shift, unset };
+}
+
+/* controls in the order the setup walkthrough asks for them: top of the stick down */
+function setupOrder(stick) {
+  const gs = groupsOf(stick).sort((a, b) => (a.dot[1] - b.dot[1]) || (a.dot[0] - b.dot[0]));
+  return gs.flatMap((g) => g.members.filter((m) => !m.inputs.base).map((m) => ({ g, m })));
 }
 
 /* ---------------- boot ---------------- */
@@ -118,6 +125,12 @@ function render() {
   $("#hint").textContent = S.view === "edit"
     ? "Edit: drag numbered dots onto the buttons · click a label to bind · Map a control to add one"
     : `${S.state.layout.name} · ${S.state.layout.count} bindings · SC ${S.state.catalog.sc_version}`;
+  const need = shown().filter((x) => x.unassigned && x.unassigned.length);
+  const sb = $("#btnSetup");
+  if (sb) {
+    sb.hidden = !need.length || !!S.coach;
+    if (need.length) sb.textContent = `Set up ${need[0].side === "L" ? "left" : need[0].side === "R" ? "right" : "this"} stick · ${need[0].unassigned.length} to learn`;
+  }
   renderStage();
   renderOthers();
 }
@@ -201,7 +214,7 @@ function renderStage() {
     const capL = i === 0 ? Math.max(ix, colL + cardW + 8) : ix, capR = i === 0 ? ix + iw : Math.min(ix + iw, colR - 8);
     if (both) stage.append(h("div", { class: "stick-cap", style: `left:${capL}px;top:${iy + ih + 4}px;width:${capR - capL}px` },
       (stick.side === "L" ? "LEFT" : stick.side === "R" ? "RIGHT" : "") + " · " + stick.name.toUpperCase() + (stick.connected ? "" : " · NOT CONNECTED")));
-    if (S.view === "edit") stage.append(h("button", { class: "photo-btn", style: `left:${ix + iw / 2}px;top:${iy + ih - 34}px`,
+    if (S.view === "edit" && S.showPhotoBtn) stage.append(h("button", { class: "photo-btn", style: `left:${ix + iw / 2}px;top:${iy + ih - 34}px`,
       onclick: () => setPhoto(stick) }, S.images[stick.name] ? "Change stick photo" : "Set stick photo"));
 
     const groups = groupsOf(stick);
@@ -246,7 +259,8 @@ function renderStage() {
 
 function drawCard(stage, svg, stick, p, x, y, w, ch, side, compact) {
   const g = p.g;
-  const { main, extra, shift } = summary(stick, g);
+  const { main, extra, shift, unset } = summary(stick, g);
+  const target = S.coach && S.coach.slot === stick.slot && g.members.some((m) => m.id === S.coach.cid);
   const hotKeys = S.live[stick.slot] || new Set();
   let hot = false, hotShift = false, hotMember = null;
   for (const m of g.members) {
@@ -255,8 +269,9 @@ function drawCard(stage, svg, stick, p, x, y, w, ch, side, compact) {
   }
   const isShiftCtl = !main && !shift && /shift|modifier/i.test(g.name);
   const sel = S.sel && S.sel.slot === stick.slot && S.sel.group === g.id;
-  const cls = ["card", compact && "compact", hot && "hot", hotShift && "shift", sel && "sel", isShiftCtl && "shiftctl"].filter(Boolean).join(" ");
-  const codes = g.hat ? `${g.members.length} DIR` : Object.entries(g.members[0].inputs).map(([l, k]) => (l === "shift" ? "⇧" : "") + shortKey(k)).join(" · ");
+  const cls = ["card", compact && "compact", hot && "hot", hotShift && "shift", (sel || target) && "sel", isShiftCtl && "shiftctl", unset && "unset", target && "target"].filter(Boolean).join(" ");
+  const codes = g.members.some((m) => m.dir) ? `${g.members.length} DIR`
+    : (g.members.flatMap((m) => Object.entries(m.inputs).map(([l, k]) => (l === "shift" ? "⇧" : "") + shortKey(k))).join(" · ") || "NOT SET");
   // when a hat is pressed, show that direction's action
   let a, aTag = "";
   const pick = hotMember && g.hat ? { m: hotMember, b: bindsFor(stick, hotShift ? hotMember.inputs.shift : hotMember.inputs.base)[0] } : null;
@@ -269,7 +284,7 @@ function drawCard(stage, svg, stick, p, x, y, w, ch, side, compact) {
   const card = h("button", { class: cls, style: `left:${x}px;top:${y}px;width:${w}px;height:${ch}px`,
     onclick: () => openDrawer(stick.slot, g.id) },
     h("div", { class: "hd" }, h("span", { class: "n" }, String(p.num)), h("span", { class: "name" }, g.name.toUpperCase()), h("span", { class: "code" }, codes)),
-    h("div", { class: "a" + (a ? "" : " none") }, a || (isShiftCtl ? "Hold for ⇧ layer" : "—"),
+    h("div", { class: "a" + (a ? "" : " none") }, a || (target ? `Press it now${g.hat ? " · " + (DIR_ARROW[stick.controls.find((c) => c.id === S.coach.cid).dir] || "") : ""}` : unset ? "Not set up · press to learn" : isShiftCtl ? "Hold for ⇧ layer" : "—"),
       aTag ? h("span", { class: "tag" }, aTag) : null, more > 0 ? h("span", { class: "tag" }, "+" + more) : null),
     (!compact || (ch >= 48 && (shift || isShiftCtl))) ? h("div", { class: "s" + (shift ? "" : " none") },
       shift ? ["⇧ " + shift.b.label, tagFor(shift.b.activation) ? h("span", { class: "tag" }, tagFor(shift.b.activation)) : null]
@@ -283,7 +298,7 @@ function drawCard(stage, svg, stick, p, x, y, w, ch, side, compact) {
   path.setAttribute("d", `M${ex},${cy} H${elbow} L${p.x},${p.y}`);
   if (hot) path.setAttribute("class", "hot" + (hotShift ? " shift" : ""));
   svg.append(path);
-  const dot = h("div", { class: ["dot", hot && "hot", hotShift && "shift", sel && "sel", isShiftCtl && "shiftkey"].filter(Boolean).join(" "),
+  const dot = h("div", { class: ["dot", hot && "hot", hotShift && "shift", (sel || target) && "sel", target && "target", unset && "unset", isShiftCtl && "shiftkey"].filter(Boolean).join(" "),
     style: `left:${p.x}px;top:${p.y}px`, title: g.name }, String(p.num));
   if (S.view === "edit") dot.addEventListener("pointerdown", (e) => startDrag(e, stick, g, dot));
   stage.append(dot);
@@ -357,7 +372,8 @@ function renderDrawer() {
       const row = h("div", { class: "layer" + (layer === "shift" ? " shift" : "") }, h("div", { class: "ln" }, layer === "shift" ? "⇧ SHIFT" : "BASE"));
       const col = h("div", {});
       if (!key) {
-        if (layer === "shift" && m.id) col.append(h("button", { class: "add shift", onclick: () => shiftFlow(stick.slot, m) }, "+ Add a shift layer (press it with shift held)"));
+        if (layer === "shift" && m.id && m.inputs.base) col.append(h("button", { class: "add shift", onclick: () => pressFlow(stick.slot, m, "shift") }, "+ Add a shift layer (press it with shift held)"));
+        else if (layer === "base" && m.id) col.append(h("button", { class: "add", onclick: () => pressFlow(stick.slot, m, "base") }, "Not set up · press the control to learn it"));
         else col.append(h("div", { class: "s none", style: "padding-top:8px;color:var(--faint);font-size:12px" }, "—"));
         row.append(col); sec.append(row); continue;
       }
@@ -482,12 +498,55 @@ async function mapFlow(slot, key) {
   name.addEventListener("keydown", (e) => e.key === "Enter" && save());
 }
 
-async function shiftFlow(slot, m) {
-  const got = await waitForPress(slot, `Shift layer for ${m.label}`, "Hold your shift button and press this control.");
+async function pressFlow(slot, m, layer) {
+  const name = m.group ? `${m.group} ${DIR_ARROW[m.dir] || ""} ${m.label}` : m.label;
+  const got = await waitForPress(slot, layer === "shift" ? `Shift layer for ${name}` : name,
+    layer === "shift" ? "Hold your shift button and press this control." : "Press this control on your stick.");
   if (!got) return;
   closeModal();
-  apply(await API.map_control(got.slot, got.key, "", "", "", m.id));
+  await apply(await API.assign_input(got.slot, m.id, layer, got.key));
   renderDrawer();
+}
+
+/* guided setup: highlight each control in turn and learn its input from a press */
+async function setupFlow(stick) {
+  const todo = setupOrder(stick);
+  if (!todo.length) return;
+  S.view = "edit";
+  document.querySelectorAll("#views button").forEach((b) => b.classList.toggle("on", b.dataset.view === "edit"));
+  if (S.stick === "both" || S.stick !== stick.slot) S.stick = stick.slot;
+  let done = 0;
+  for (let i = 0; i < todo.length; i++) {
+    const { g, m } = todo[i];
+    S.coach = { slot: stick.slot, cid: m.id };
+    render();
+    const what = g.hat ? `${g.name} — ${DIR_ARROW[m.dir] || ""} ${m.dir}` : g.name;
+    const got = await coach(`${i + 1} of ${todo.length}`, what,
+      g.hat && m.dir === "push" ? "Push the hat straight in." : g.hat ? `Push the hat ${m.dir}.` : "Press it once.");
+    if (got === "stop") break;
+    if (got === "skip") continue;
+    const res = await API.assign_input(got.slot, m.id, "base", got.key);
+    if (res.state) S.state = res.state;
+    done++;
+  }
+  S.coach = null;
+  $("#coach").hidden = true;
+  render();
+  toast(done ? `Learned ${done} control${done === 1 ? "" : "s"}. Drag any dot that's off onto its button.` : "Setup stopped");
+}
+
+function coach(step, what, how) {
+  return new Promise((resolve) => {
+    API.arm_capture(S.coach.slot);
+    S.capture = (got) => resolve(got);
+    const c = $("#coach");
+    c.innerHTML = "";
+    const finish = (v) => { API.cancel_capture(); S.capture = null; resolve(v); };
+    c.append(h("span", { class: "step" }, step), h("div", { class: "what" }, h("b", {}, what), h("span", {}, how)),
+      h("button", { class: "btn", onclick: () => finish("skip") }, "Skip — not on my stick"),
+      h("button", { class: "btn", onclick: () => finish("stop") }, "Stop"));
+    c.hidden = false;
+  });
 }
 
 async function addDirFlow(slot, g) {
@@ -633,6 +692,9 @@ function wire() {
   // edit mode gets a "Map a control" button in the bar
   const mapBtn = h("button", { class: "chip", id: "btnMap", style: "border-style:dashed;color:var(--cyan-soft)", onclick: () => mapFlow() }, "+ Map a control");
   $(".bar").insertBefore(mapBtn, $("#hint"));
+  const setupBtn = h("button", { class: "chip setup", id: "btnSetup", onclick: () => {
+    const s = shown().find((x) => x.unassigned.length) ; if (s) setupFlow(s); } }, "");
+  $(".bar").insertBefore(setupBtn, $("#hint"));
   const obs = new MutationObserver(() => { mapBtn.hidden = S.view !== "edit"; });
   obs.observe($("#app"), { attributes: true, attributeFilter: ["class"] });
   mapBtn.hidden = true;

@@ -20,18 +20,17 @@ All versions and the zip package: [Releases](https://github.com/shoelesstim/stic
 
 It never edits SC's live `actionmaps.xml`; SC overwrites that file anyway.
 
-## Make it look like your stick
+## Your sticks, ready to go
 
-Stick Citizen draws your real sticks with a label on every physical control, wired to the button it sits on.
+The VKB Gladiator NXT EVO (left and right, SCG grip) is built in: photo, every control labeled with VKB's names, placed on the stick. Plug in and they show up.
 
-1. Click **Edit**, then **Set stick photo**. Any product photo on a white background works; the background is removed for you.
-2. Click **+ Map a control** and press a control on your stick. Name it (Main trigger, Red button...). For a hat, give each direction the same group name (e.g. "8-way hat A1"); a real hat fills in its direction for you.
-3. Drag the numbered dot onto that button in the photo.
-4. Click a label to bind actions. Each control has a **base** row and a **⇧ shift** row: click *Add a shift layer* and press the control with your shift button held.
+The first time, click **Set up left stick** (and right): each control lights up in turn and you press it, so Stick Citizen learns your stick's button numbers. Takes about two minutes per stick; **Skip** anything your grip doesn't have. The trigger's two stages are already known.
 
-The **Mode** chips (Flight, Mining, Salvage, Turret, On foot, Ground) show only the bindings for that kind of play. Inputs your stick reports that aren't on your map show in **Unmapped inputs** only once they're bound or pressed, so the 100+ spare button numbers a VKB stick reports stay out of the way.
+Then click any label to bind actions. Each control has a **base** row and a **⇧ shift** row (press the control with your shift button held to add it).
 
-Your stick maps, photos and settings live in `%APPDATA%\StickCitizen`, so downloading a new version never loses them.
+The **Mode** chips (Flight, Mining, Salvage, Turret, On foot, Ground) show only the bindings for that kind of play. Spare button numbers your stick reports stay out of the way in **Unmapped inputs**.
+
+Your setup lives in `%APPDATA%\StickCitizen`, so a new version never loses it.
 
 ## Shift layers and the mini-stick
 

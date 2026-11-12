@@ -251,8 +251,28 @@ class Api:
         s = self._slot(slot)
         name = s["name"] if s else f"js{slot}"
         if name not in self._templates:
-            self._templates[name] = load_template(name)
+            t = load_template(name)
+            self._templates[name] = t
+            self._fix_photo(t)
         return self._templates[name]
+
+    def _fix_photo(self, t):
+        """v2 photos kept their white background: cut them out once."""
+        p = self._image_path(t)
+        if p is None:
+            return
+        from .photo import cutout, needs_cutout
+        if not needs_cutout(p):
+            return
+        d = user_dir() / "images"
+        d.mkdir(exist_ok=True)
+        name = f"{Path(t.name).stem or 'stick'}-{int(time.time())}.png".replace(" ", "_")
+        try:
+            cutout(p, d / name)
+        except Exception:  # noqa: BLE001 - keep the original photo if it can't be processed
+            return
+        t.image = name
+        t.save()
 
     def _bound_keys(self, slot):
         return {key_of(k[1], k[2], k[3]) for k, v in self._bset.binds.items() if v and k[0] == int(slot)}
@@ -281,6 +301,7 @@ class Api:
                 **{k: s[k] for k in ("slot", "name", "connected", "side", "buttons")},
                 "has_image": self._image_path(t) is not None,
                 "controls": [c.to_json() for c in t.controls],
+                "unassigned": [c.id for c in t.unassigned()],
                 "others": other_inputs(t, self._bound_keys(s["slot"]), self._seen.get(s["slot"], set())),
                 "binds": self._binds_json(s["slot"]),
             })
@@ -337,7 +358,7 @@ class Api:
     @staticmethod
     def _image_path(t):
         if not t.image:
-            return None
+            return t.starter_image
         p = Path(t.image).expanduser()
         if not p.is_absolute():
             p = user_dir() / "images" / p
@@ -421,6 +442,17 @@ class Api:
             msg = f"{(group + ' ') if group else ''}{c.label} = {short_label(key)}"
         t.save()
         return self._ok(msg, control=c.id)
+
+    def assign_input(self, slot, cid, layer, key):
+        """Give a control (from the starter map) the input that was just pressed."""
+        t = self._tpl(slot)
+        c = t.control(cid)
+        if not c:
+            return {"ok": False, "msg": "That control is gone"}
+        t.set_layer(c, layer, key)
+        t.save()
+        name = f"{c.group} {c.label}".strip() if c.group else c.label
+        return self._ok(f"{name}{' ⇧' if layer == 'shift' else ''} = {short_label(key)}")
 
     def set_dot(self, slot, cid, fx, fy):
         t = self._tpl(slot)

@@ -77,3 +77,15 @@ def _largest_blob(alpha):
     keep = keep.resize((w, h)).point(lambda v: 255 if v > 0 else 0)
     keep = keep.filter(__import__("PIL.ImageFilter", fromlist=["MaxFilter"]).MaxFilter(9))
     return ImageChops.multiply(alpha, keep)
+
+
+def needs_cutout(path) -> bool:
+    """True for a photo that still has its solid background (no transparent pixels)."""
+    from PIL import Image
+    try:
+        with Image.open(path) as im:
+            if im.mode not in ("RGBA", "LA", "P"):
+                return True
+            return im.convert("RGBA").getchannel("A").getextrema()[0] > 200
+    except OSError:
+        return False
