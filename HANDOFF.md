@@ -1,6 +1,6 @@
 # Stick Citizen — Handoff
 
-**State (2026-11-12): v3.1.0 shipped. The cockpit screen works end to end in the preview harness; it has had one real run on Tim's PC (v3.0.0), which exposed that a fresh install started blank. v3.1.0 fixes that with built-in VKB profiles and a guided setup. Next: Tim runs setup on both sticks, then we bake his learned button numbers into the built-in profiles so nobody else has to.**
+**State (2026-11-12): v3.2.0 shipped (versioned exe names; T1 is an axis, EN1 an encoder; left A2 is the 8-way/mouse mini-stick). v3.1.0 added built-in profiles. The cockpit screen works end to end in the preview harness; it has had one real run on Tim's PC (v3.0.0), which exposed that a fresh install started blank. v3.1.0 fixes that with built-in VKB profiles and a guided setup. Next: Tim runs setup on both sticks, then we bake his learned button numbers into the built-in profiles so nobody else has to.**
 
 Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. This file is the engineering state.
 
@@ -22,7 +22,8 @@ Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. T
 
 1. **Tim: run Set up on both sticks** (v3.1.0). Watch for: dots that sit off their button, controls the SCG Standard grip doesn't have, hats that report as POV hats (h1u…) vs buttons.
 2. **Bake defaults:** copy Tim's learned `inputs` from `%APPDATA%\StickCitizen\templates\vkbsim-gladiator-evo-*.json` into `data/starters/*.json` (keep labels and dots). Then setup is only for people who changed their VKB config. Add a "Use VKB defaults / Re-learn" choice.
-3. **Fix dot positions** from Tim's screenshots (the hats on the head are best guesses; C1 position especially).
+3. **Fix dot positions and names** from Tim's screenshots (head hats are best guesses; C1 especially). Known from Tim: T1 (center base wheel) is an axis, EN1 is an encoder, SW1 a switch; on the left stick A2 is the switchable 8-way hat / mouse mini-stick. Check whether the right stick's equivalent is also A2.
+   - Mini-stick in mouse mode sends mouse, not joystick input; the planned mode label/toast (Base Conditions) still to build.
 4. **Action catalog gaps:** `data/sc_actions.json` lacks some 4.x actions (e.g. `v_attack1_group1` weapon-group fire), so they show humanized names. Regenerate with `tools/make_catalog.py` from a current SC install.
 5. **Real Windows check of packaging:** pywebview + PyInstaller onefile (`--collect-all webview`) built in CI but only v3.0.0 has run on a real machine. Confirm WebView2, file dialogs, speech, and the Fly tab subprocess.
 6. Later: mini-stick mode label (mouse vs hat), print chart export, ring course as a tab, more device profiles.
@@ -35,5 +36,5 @@ The built-in photos are VKB's product images. Shipping them in a public repo/rel
 
 - Tests: `SDL_VIDEODRIVER=dummy python -m pytest -q` (no Qt, no window needed)
 - Look at it: `python tools/preview.py --out shots/` then open the PNGs
-- Release: bump `stick_citizen/__init__.py` `__version__`, push to main → CI tests, builds `StickCitizen.exe`, cuts a GitHub release
+- Release: bump `stick_citizen/__init__.py` `__version__`, push to main → CI tests, builds `StickCitizen-vX.Y.Z.exe` (version also in Properties → Details via `tools/make_version_file.py`), cuts release `vX.Y.Z` with the exe and `StickCitizen-vX.Y.Z.zip`; the rolling `latest` pre-release gets `StickCitizen-vX.Y.Z-dev-<sha>.exe`
 - Repo: github.com/ShoelessTim/stick-citizen (moved from lowercase `shoelesstim`)

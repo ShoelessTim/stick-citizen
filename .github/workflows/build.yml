@@ -27,31 +27,44 @@ jobs:
           SDL_AUDIODRIVER: dummy
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest -q
+      - name: Version
+        id: ver
+        shell: bash
+        run: |
+          VER="v$(python -c 'import stick_citizen; print(stick_citizen.__version__)')"
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          echo "exe=StickCitizen-$VER.exe" >> "$GITHUB_OUTPUT"
+          python tools/make_version_file.py version_info.txt
       - name: Build
-        run: pyinstaller --onefile --windowed --name StickCitizen --add-data "stick_citizen/data;stick_citizen/data" --add-data "stick_citizen/web;stick_citizen/web" --collect-all webview run_stick_citizen.py
+        run: pyinstaller --onefile --windowed --name "StickCitizen-${{ steps.ver.outputs.ver }}" --version-file version_info.txt --add-data "stick_citizen/data;stick_citizen/data" --add-data "stick_citizen/web;stick_citizen/web" --collect-all webview run_stick_citizen.py
       - uses: actions/upload-artifact@v4
         with:
-          name: StickCitizen
-          path: dist/StickCitizen.exe
+          name: StickCitizen-${{ steps.ver.outputs.ver }}
+          path: dist/${{ steps.ver.outputs.exe }}
       - name: Versioned release (when stick_citizen.__version__ is new)
         if: github.ref == 'refs/heads/main'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.ver.outputs.ver }}
+          EXE: ${{ steps.ver.outputs.exe }}
         run: |
-          VER="v$(python -c 'import stick_citizen; print(stick_citizen.__version__)')"
           if gh release view "$VER" >/dev/null 2>&1; then echo "$VER already released"; exit 0; fi
-          mkdir -p pkg/StickCitizen/templates
-          cp dist/StickCitizen.exe README.md LICENSE pkg/StickCitizen/
-          (cd pkg && 7z a "../dist/StickCitizen-$VER.zip" StickCitizen >/dev/null)
-          gh release create "$VER" dist/StickCitizen.exe "dist/StickCitizen-$VER.zip" --target "$GITHUB_SHA" \
-            --title "Stick Citizen $VER" --latest --notes "**Download StickCitizen.exe** below and double-click it (Windows, no install). The zip has the exe, README and an empty templates folder."
+          mkdir -p "pkg/StickCitizen-$VER"
+          cp "dist/$EXE" README.md LICENSE "pkg/StickCitizen-$VER/"
+          (cd pkg && 7z a "../dist/StickCitizen-$VER.zip" "StickCitizen-$VER" >/dev/null)
+          gh release create "$VER" "dist/$EXE" "dist/StickCitizen-$VER.zip" --target "$GITHUB_SHA" \
+            --title "Stick Citizen $VER" --latest --notes "**Download $EXE** below and double-click it (Windows, no install). Your setup is kept in %APPDATA%\\StickCitizen, so newer versions pick it up."
       - name: Release (latest from main)
         if: github.ref == 'refs/heads/main'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.ver.outputs.ver }}
+          EXE: ${{ steps.ver.outputs.exe }}
         run: |
+          DEV="StickCitizen-$VER-dev-${GITHUB_SHA::7}.exe"
+          cp "dist/$EXE" "dist/$DEV"
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest dist/StickCitizen.exe --target "$GITHUB_SHA" \
-            --title "Dev build (main)" --notes "Untested dev build from main at ${GITHUB_SHA::7}. Download StickCitizen.exe below." --prerelease --latest=false
+          gh release create latest "dist/$DEV" --target "$GITHUB_SHA" \
+            --title "Dev build (main)" --notes "Untested dev build from main at ${GITHUB_SHA::7}. Download $DEV below." --prerelease --latest=false

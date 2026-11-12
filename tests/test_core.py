@@ -178,6 +178,20 @@ def test_builtin_vkb_profile(tmp_path, monkeypatch):
     assert cid not in r3["unassigned"]
 
 
+def test_axis_capture_for_t1_wheel(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    r = next(s for s in api.get_state()["sticks"] if s["side"] == "R")
+    t1 = next(c for c in r["controls"] if c["id"] == "wheel-t1")
+    en1 = [c for c in r["controls"] if c["group"] == "Encoder EN1"]
+    assert t1["kind"] == "axis" and {c["dir"] for c in en1} == {"up", "down"}
+    hub.axes = {"u2": [0, 0, 0, 0, 0, 0, -1.0]}
+    api.arm_capture(r["slot"], "axis")
+    hub.press("u2", "b5")                                   # a button press doesn't count for an axis
+    assert "captured" not in api.poll()
+    hub.axes = {"u2": [0, 0, 0, 0, 0, 0, 0.4]}
+    assert api.poll()["captured"] == {"slot": r["slot"], "key": "a6"}
+
+
 def test_mode_of():
     from stick_citizen.webapi import mode_of
     assert mode_of("spaceship_weapons") == "flight" and mode_of("spaceship_mining") == "mining"

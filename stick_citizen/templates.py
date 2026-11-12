@@ -73,8 +73,10 @@ def _norm_key(v):
 
 
 class Control:
-    def __init__(self, cid, label, inputs=None, group="", direction="", dot=None):
+    def __init__(self, cid, label, inputs=None, group="", direction="", dot=None, kind="", how=""):
         self.id = cid
+        self.kind = kind or ""          # "" = button/hat, "axis" = a wheel or lever the setup learns by movement
+        self.how = how or ""            # what the setup walkthrough tells you to do
         self.label = label
         self.group = group or ""
         self.dir = direction or ""
@@ -90,7 +92,7 @@ class Control:
 
     def to_json(self):
         return {"id": self.id, "label": self.label, "group": self.group, "dir": self.dir,
-                "dot": self.dot, "inputs": self.inputs}
+                "dot": self.dot, "inputs": self.inputs, "kind": self.kind, "how": self.how}
 
 
 class Template:
@@ -173,7 +175,7 @@ def from_json(raw: dict, device_name: str, path=None) -> Template:
     controls = []
     for i, c in enumerate(raw.get("controls", [])):
         ctl = Control(c.get("id") or f"c{i}", c.get("label") or "Control", c.get("inputs"),
-                      c.get("group", ""), c.get("dir", ""), c.get("dot"))
+                      c.get("group", ""), c.get("dir", ""), c.get("dot"), c.get("kind", ""), c.get("how", ""))
         controls.append(ctl)
     # v2 files ("tiles") carry nothing over: the built-in profile replaces their grid and photo.
     image = "" if "tiles" in raw else raw.get("image", "")

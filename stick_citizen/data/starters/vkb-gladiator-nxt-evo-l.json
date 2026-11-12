@@ -2,62 +2,124 @@
  "name": "VKB Gladiator NXT EVO SCG L",
  "match": "gladiator.*\\bl\\b",
  "image": "vkb-gladiator-nxt-evo-l.png",
- "note": "Built-in profile. Names follow VKB's SCG templates; trigger stages 1/2 are VKB defaults; other buttons are learned once with 'Set up'. Photos: VKB product images.",
+ "note": "Built-in profile. Names follow VKB's SCG templates; trigger stages 1/2 are VKB defaults; other buttons are learned once with 'Set up'. Photos: VKB product images. Left stick: A2 is the switchable 8-way / mouse mini-stick (per Tim, 2026-11-12); only its hat mode reaches the app.",
  "controls": [
   {
-   "id": "hat-a1-up",
+   "id": "mini-stick-a2-up",
    "label": "up",
-   "group": "Hat A1",
+   "group": "Mini-stick A2",
    "dir": "up",
    "dot": [
     0.711,
     0.083
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it up."
   },
   {
-   "id": "hat-a1-right",
+   "id": "mini-stick-a2-up-right",
+   "label": "up-right",
+   "group": "Mini-stick A2",
+   "dir": "up-right",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it up and right."
+  },
+  {
+   "id": "mini-stick-a2-right",
    "label": "right",
-   "group": "Hat A1",
+   "group": "Mini-stick A2",
    "dir": "right",
    "dot": [
     0.711,
     0.083
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it right."
   },
   {
-   "id": "hat-a1-down",
+   "id": "mini-stick-a2-down-right",
+   "label": "down-right",
+   "group": "Mini-stick A2",
+   "dir": "down-right",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it down and right."
+  },
+  {
+   "id": "mini-stick-a2-down",
    "label": "down",
-   "group": "Hat A1",
+   "group": "Mini-stick A2",
    "dir": "down",
    "dot": [
     0.711,
     0.083
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it down."
   },
   {
-   "id": "hat-a1-left",
+   "id": "mini-stick-a2-down-left",
+   "label": "down-left",
+   "group": "Mini-stick A2",
+   "dir": "down-left",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it down and left."
+  },
+  {
+   "id": "mini-stick-a2-left",
    "label": "left",
-   "group": "Hat A1",
+   "group": "Mini-stick A2",
    "dir": "left",
    "dot": [
     0.711,
     0.083
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it left."
   },
   {
-   "id": "hat-a1-push",
+   "id": "mini-stick-a2-up-left",
+   "label": "up-left",
+   "group": "Mini-stick A2",
+   "dir": "up-left",
+   "dot": [
+    0.711,
+    0.083
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it up and left."
+  },
+  {
+   "id": "mini-stick-a2-push",
    "label": "push",
-   "group": "Hat A1",
+   "group": "Mini-stick A2",
    "dir": "push",
    "dot": [
     0.711,
     0.083
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "Put it in 8-way hat mode (press it in to switch from mouse), then push it straight in."
   },
   {
    "id": "hat-a4-up",
@@ -225,8 +287,8 @@
    "inputs": {}
   },
   {
-   "id": "red-button-a2",
-   "label": "Red button A2",
+   "id": "red-button",
+   "label": "Red button",
    "group": "",
    "dir": "",
    "dot": [
@@ -246,7 +308,8 @@
    ],
    "inputs": {
     "base": "b1"
-   }
+   },
+   "how": "Pull the trigger."
   },
   {
    "id": "main-trigger-stage2",
@@ -259,7 +322,8 @@
    ],
    "inputs": {
     "base": "b2"
-   }
+   },
+   "how": "Pull the trigger all the way."
   },
   {
    "id": "rapid-trigger",
@@ -336,7 +400,8 @@
     0.158,
     0.778
    ],
-   "inputs": {}
+   "inputs": {},
+   "how": "Flip the switch up."
   },
   {
    "id": "switch-sw1-down",
@@ -347,29 +412,21 @@
     0.158,
     0.778
    ],
-   "inputs": {}
+   "inputs": {},
+   "how": "Flip the switch down."
   },
   {
-   "id": "wheel-t1-up",
-   "label": "up",
-   "group": "Wheel T1",
-   "dir": "up",
+   "id": "wheel-t1",
+   "label": "Wheel T1",
+   "group": "",
+   "dir": "",
    "dot": [
     0.23,
     0.794
    ],
-   "inputs": {}
-  },
-  {
-   "id": "wheel-t1-down",
-   "label": "down",
-   "group": "Wheel T1",
-   "dir": "down",
-   "dot": [
-    0.23,
-    0.794
-   ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "axis",
+   "how": "Roll the wheel from one end to the other."
   },
   {
    "id": "encoder-en1-up",
@@ -380,7 +437,8 @@
     0.309,
     0.822
    ],
-   "inputs": {}
+   "inputs": {},
+   "how": "Turn the encoder one click up."
   },
   {
    "id": "encoder-en1-down",
@@ -391,7 +449,8 @@
     0.309,
     0.822
    ],
-   "inputs": {}
+   "inputs": {},
+   "how": "Turn the encoder one click down."
   }
  ]
 }

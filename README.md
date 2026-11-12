@@ -4,9 +4,9 @@ See your HOSAS on screen, drag Star Citizen actions onto it, fly-test it, and sa
 
 ## ⬇ Download
 
-**[Download StickCitizen.exe](https://github.com/shoelesstim/stick-citizen/releases/latest/download/StickCitizen.exe)** (Windows) and double-click it. No install.
+**[Download the latest StickCitizen-vX.Y.Z.exe](https://github.com/ShoelessTim/stick-citizen/releases/latest)** (Windows) and double-click it. No install. The version is in the file name, the window title, and the exe's Properties → Details.
 
-All versions and the zip package: [Releases](https://github.com/shoelesstim/stick-citizen/releases).
+All versions and the zip package: [Releases](https://github.com/ShoelessTim/stick-citizen/releases).
 
 ## Build your bindings
 

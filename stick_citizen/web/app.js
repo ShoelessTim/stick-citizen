@@ -38,7 +38,8 @@ const shown = () => {
 };
 const inMode = (b) => S.mode === "all" || b.mode === S.mode || b.mode === "general";
 const bindsFor = (stick, key) => (key ? stick.binds[key] || [] : []).filter(inMode);
-const shortKey = (k) => (k[0] === "b" ? "B" + k.slice(1) : k[0] === "h" ? `H${k.slice(1, -1)}${DIR_ARROW[HAT_DIR[k.slice(-1)]]}` : k.toUpperCase());
+const AXES = ["X axis", "Y axis", "Z axis", "RotX", "RotY", "RotZ", "Slider 1", "Slider 2"];
+const shortKey = (k) => (k[0] === "b" ? "B" + k.slice(1) : k[0] === "h" ? `H${k.slice(1, -1)}${DIR_ARROW[HAT_DIR[k.slice(-1)]]}` : AXES[+k.slice(1)] || k.toUpperCase());
 const tagFor = (act) => (/hold/.test(act || "") ? "HOLD" : /double/.test(act || "") ? "2×" : "");
 
 /* group the stick map's controls into on-screen labels */
@@ -418,7 +419,8 @@ function searchBox(stick, key) {
   const results = h("div", { class: "results" });
   let kb = 0, rows = [];
   async function run() {
-    const list = await API.search(input.value, S.mode, 80);
+    let list = await API.search(input.value, S.mode, 120);
+    if (key[0] === "a") list = list.filter((x) => x.axis);            // wheels and levers take axis actions
     results.innerHTML = "";
     rows = list.map((a, i) => h("button", { class: "res" + (i === kb ? " kb" : ""), onclick: () => pick(a) },
       h("span", { class: "t" }, (a.axis ? "⇕ " : "") + a.label), h("span", { class: "g" }, a.group), a.bound ? h("span", { class: "b" }, a.bound) : null));
@@ -458,9 +460,9 @@ function modal(content) {
 }
 function closeModal() { $("#modal").hidden = true; API.cancel_capture(); S.capture = null; }
 
-function waitForPress(slot, title, text) {
+function waitForPress(slot, title, text, want = "button") {
   return new Promise((resolve) => {
-    API.arm_capture(slot || 0);
+    API.arm_capture(slot || 0, want);
     S.capture = resolve;
     modal([h("h2", {}, title), h("p", {}, text), h("div", { class: "wait" }, h("i"), "Waiting for a press…"),
       h("div", { class: "row" }, h("button", { class: "btn", onclick: () => { closeModal(); resolve(null); } }, "Cancel"))]);
@@ -501,7 +503,7 @@ async function mapFlow(slot, key) {
 async function pressFlow(slot, m, layer) {
   const name = m.group ? `${m.group} ${DIR_ARROW[m.dir] || ""} ${m.label}` : m.label;
   const got = await waitForPress(slot, layer === "shift" ? `Shift layer for ${name}` : name,
-    layer === "shift" ? "Hold your shift button and press this control." : "Press this control on your stick.");
+    layer === "shift" ? "Hold your shift button and press this control." : (m.how || "Press this control on your stick."), m.kind === "axis" ? "axis" : "button");
   if (!got) return;
   closeModal();
   await apply(await API.assign_input(got.slot, m.id, layer, got.key));
@@ -520,9 +522,9 @@ async function setupFlow(stick) {
     const { g, m } = todo[i];
     S.coach = { slot: stick.slot, cid: m.id };
     render();
-    const what = g.hat ? `${g.name} — ${DIR_ARROW[m.dir] || ""} ${m.dir}` : g.name;
-    const got = await coach(`${i + 1} of ${todo.length}`, what,
-      g.hat && m.dir === "push" ? "Push the hat straight in." : g.hat ? `Push the hat ${m.dir}.` : "Press it once.");
+    const what = m.group ? `${g.name} — ${DIR_ARROW[m.dir] || ""} ${m.dir || m.label}` : g.name;
+    const how = m.how || (g.hat && m.dir === "push" ? "Push the hat straight in." : g.hat && m.dir ? `Push the hat ${m.dir}.` : "Press it once.");
+    const got = await coach(`${i + 1} of ${todo.length}`, what, how, m.kind === "axis" ? "axis" : "button");
     if (got === "stop") break;
     if (got === "skip") continue;
     const res = await API.assign_input(got.slot, m.id, "base", got.key);
@@ -535,9 +537,9 @@ async function setupFlow(stick) {
   toast(done ? `Learned ${done} control${done === 1 ? "" : "s"}. Drag any dot that's off onto its button.` : "Setup stopped");
 }
 
-function coach(step, what, how) {
+function coach(step, what, how, want = "button") {
   return new Promise((resolve) => {
-    API.arm_capture(S.coach.slot);
+    API.arm_capture(S.coach.slot, want);
     S.capture = (got) => resolve(got);
     const c = $("#coach");
     c.innerHTML = "";

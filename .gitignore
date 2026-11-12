@@ -4,3 +4,4 @@ build/
 dist/
 *.spec
 stick_citizen.json
+version_info.txt

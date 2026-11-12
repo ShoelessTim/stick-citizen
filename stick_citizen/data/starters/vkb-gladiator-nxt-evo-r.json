@@ -246,7 +246,8 @@
    ],
    "inputs": {
     "base": "b1"
-   }
+   },
+   "how": "Pull the trigger."
   },
   {
    "id": "main-trigger-stage2",
@@ -259,7 +260,8 @@
    ],
    "inputs": {
     "base": "b2"
-   }
+   },
+   "how": "Pull the trigger all the way."
   },
   {
    "id": "rapid-trigger",
@@ -336,7 +338,8 @@
     0.687,
     0.817
    ],
-   "inputs": {}
+   "inputs": {},
+   "how": "Flip the switch up."
   },
   {
    "id": "switch-sw1-down",
@@ -347,29 +350,21 @@
     0.687,
     0.817
    ],
-   "inputs": {}
+   "inputs": {},
+   "how": "Flip the switch down."
   },
   {
-   "id": "wheel-t1-up",
-   "label": "up",
-   "group": "Wheel T1",
-   "dir": "up",
+   "id": "wheel-t1",
+   "label": "Wheel T1",
+   "group": "",
+   "dir": "",
    "dot": [
     0.765,
     0.783
    ],
-   "inputs": {}
-  },
-  {
-   "id": "wheel-t1-down",
-   "label": "down",
-   "group": "Wheel T1",
-   "dir": "down",
-   "dot": [
-    0.765,
-    0.783
-   ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "axis",
+   "how": "Roll the wheel from one end to the other."
   },
   {
    "id": "encoder-en1-up",
@@ -380,7 +375,8 @@
     0.837,
     0.756
    ],
-   "inputs": {}
+   "inputs": {},
+   "how": "Turn the encoder one click up."
   },
   {
    "id": "encoder-en1-down",
@@ -391,7 +387,8 @@
     0.837,
     0.756
    ],
-   "inputs": {}
+   "inputs": {},
+   "how": "Turn the encoder one click down."
   }
  ]
 }

@@ -33,7 +33,7 @@ BINDS = {
           "encoder-en1-up": ("spaceship_mining", "v_increase_mining_throttle"),
           "pinky-d1": ("spaceship_movement", "v_ifcs_vector_decoupling_toggle")},
     "L": {"main-trigger-stage1": ("spaceship_movement", "v_afterburner"),
-          "red-button-a2": ("spaceship_movement", "v_space_brake"),
+          "red-button": ("spaceship_movement", "v_space_brake"),
           "side-button-b1": ("spaceship_movement", "v_atc_request"),
           "hat-a4-up": ("spaceship_movement", "v_ifcs_speed_limiter_up"),
           "hat-a4-down": ("spaceship_movement", "v_ifcs_speed_limiter_down"),

@@ -176,6 +176,8 @@ class Api:
         self._templates: dict[str, object] = {}
         self._seen: dict[int, set] = {}
         self._capture = None          # slot number (or 0 = any) waiting for a press
+        self._capture_want = "button"  # "button" (buttons + hats) or "axis"
+        self._capture_base = {}        # axis positions when an axis capture was armed
         self._captured = None
         self._last_reload_check = 0.0
         self._window = None
@@ -339,7 +341,7 @@ class Api:
                 continue
             events.append({"slot": slot, "key": key, "on": on})
             if on:
-                if self._capture is not None and (self._capture in (0, slot)):
+                if self._capture is not None and self._capture_want == "button" and (self._capture in (0, slot)):
                     self._captured = {"slot": slot, "key": key}
                     self._capture = None
                 t = self._tpl(slot)
@@ -349,6 +351,21 @@ class Api:
                         seen.add(key)
                         reload = True
         _d, axes, _g = self._hub.snapshot()
+        if self._capture is not None and self._capture_want == "axis" and not self._captured:
+            order = self._cfg.get("axis_order") or list(range(8))
+            for s in self._slots:
+                if not s["uid"] or self._capture not in (0, s["slot"]):
+                    continue
+                base = self._capture_base.get(s["uid"], [])
+                for i, v in enumerate(axes.get(s["uid"], [])):
+                    if i < len(base) and abs(v - base[i]) > 0.5:
+                        sc = order.index(i) if i in order else i
+                        if sc < 8:
+                            self._captured = {"slot": s["slot"], "key": f"a{sc}"}
+                            self._capture = None
+                        break
+                if self._captured:
+                    break
         out = {"events": events, "axes": {s["slot"]: axes.get(s["uid"], []) for s in self._slots if s["uid"]},
                "reload": reload}
         if self._captured:
@@ -419,9 +436,12 @@ class Api:
         return short_label(key)
 
     # ----- stick map edits -----
-    def arm_capture(self, slot=0):
-        """The next press (on `slot`, or any stick when 0) comes back from poll() as `captured`."""
+    def arm_capture(self, slot=0, want="button"):
+        """The next press (or, with want="axis", the next big axis move) on `slot` (0 = any stick)
+        comes back from poll() as `captured`."""
         self._capture = int(slot)
+        self._capture_want = "axis" if want == "axis" else "button"
+        self._capture_base = {uid: list(v) for uid, v in self._hub.snapshot()[1].items()}
         self._captured = None
         return {"ok": True}
 
