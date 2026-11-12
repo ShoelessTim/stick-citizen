@@ -33,26 +33,19 @@ jobs:
         with:
           name: StickCitizen
           path: dist/StickCitizen.exe
-      - name: Package
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
+      - name: Versioned release (when stick_citizen.__version__ is new)
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          New-Item -ItemType Directory -Force pkg/StickCitizen/templates | Out-Null
-          Copy-Item dist/StickCitizen.exe, README.md, LICENSE pkg/StickCitizen/
-          Compress-Archive -Path pkg/StickCitizen -DestinationPath "dist/StickCitizen-${{ github.ref_name }}.zip"
-      - name: Release (tagged versions)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Stick Citizen ${{ github.ref_name }}
-          make_latest: true
-          generate_release_notes: true
-          body: |
-            **Download `StickCitizen.exe`** below and double-click it (Windows, no install).
-            Or grab the zip for the exe plus README and an empty `templates` folder.
-          files: |
-            dist/StickCitizen.exe
-            dist/StickCitizen-${{ github.ref_name }}.zip
+          VER="v$(python -c 'import stick_citizen; print(stick_citizen.__version__)')"
+          if gh release view "$VER" >/dev/null 2>&1; then echo "$VER already released"; exit 0; fi
+          mkdir -p pkg/StickCitizen/templates
+          cp dist/StickCitizen.exe README.md LICENSE pkg/StickCitizen/
+          (cd pkg && 7z a "../dist/StickCitizen-$VER.zip" StickCitizen >/dev/null)
+          gh release create "$VER" dist/StickCitizen.exe "dist/StickCitizen-$VER.zip" --target "$GITHUB_SHA" \
+            --title "Stick Citizen $VER" --latest --notes "**Download StickCitizen.exe** below and double-click it (Windows, no install). The zip has the exe, README and an empty templates folder."
       - name: Release (latest from main)
         if: github.ref == 'refs/heads/main'
         shell: bash
