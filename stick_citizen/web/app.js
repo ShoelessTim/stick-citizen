@@ -544,7 +544,9 @@ async function setupFlow(stick) {
     if (got === "back") { let k = W.i - 1; while (k >= 0 && W.gone.has(W.todo[k].id)) k--; W.i = Math.max(0, k); W.note = null; continue; }
     if (got === "skip") { W.i++; W.note = null; continue; }
     if (got === "absent") {                       // not on this stick: take the whole control off the map
-      const drop = isAnalog(g, m) ? g.members.filter((x) => x.kind === "axis") : g.members;   // no analog mode: keep the hat
+      const drop = isAnalog(g, m) ? g.members.filter((x) => x.kind === "axis")              // no analog mode: keep the hat
+        : g.hat && DIAGONAL(m.dir) ? g.members.filter((x) => DIAGONAL(x.dir))                    // a 4-way hat: keep its 4 directions + push
+        : g.members;
       for (const x of drop) { W.gone.add(x.id); await API.edit_control(slot, x.id, null, null, null, false, true); }
       S.state = await API.get_state(); W.note = null; continue;
     }
@@ -637,8 +639,8 @@ function wizStep(st, g, m) {
     S.capture = (got) => resolve(got);
     const dirWord = m.dir === "push" ? "straight in" : m.dir;
     const title = g.hat && m.dir ? `Push it ${dirWord}` : isAnalog(g, m) ? `Analog mode: ${m.label.replace(/^analog /, "")}` : m.kind === "axis" ? "Move it end to end" : g.hat ? `${m.label}` : "Press it once";
-    const how = m.how || (g.hat && m.dir === "push" ? "Press the hat straight down into the stick, without tilting it."
-      : g.hat && m.dir ? `Tilt the hat ${m.dir} and let go.` : "Press it and let go.");
+    const how = (g.hat && DIAGONAL(m.dir) ? "If it only clicks four ways, choose “No diagonals (4-way hat)” below. " : "") + (m.how || (g.hat && m.dir === "push" ? "Press the hat straight down into the stick, without tilting it."
+      : g.hat && m.dir ? `Tilt the hat ${m.dir} and let go.` : "Press it and let go."));
     const right = [
       h("h2", { class: "wz-name" }, g.name),
       h("div", { class: "wz-do" }, title),
@@ -653,7 +655,7 @@ function wizStep(st, g, m) {
       h("div", { class: "wz-btns" },
         h("button", { class: "btn", disabled: W.i === 0 ? true : null, onclick: () => finish("back") }, "Back"),
         h("button", { class: "btn", onclick: () => finish("skip") }, "Skip for now"),
-        h("button", { class: "btn", onclick: () => finish("absent") }, isAnalog(g, m) ? "No analog mode" : g.hat ? "My stick doesn't have this" : "Not on my stick"),
+        h("button", { class: "btn", onclick: () => finish("absent") }, isAnalog(g, m) ? "No analog mode" : g.hat && DIAGONAL(m.dir) ? "No diagonals (4-way hat)" : g.hat ? "My stick doesn't have this" : "Not on my stick"),
         h("button", { class: "btn", onclick: () => finish("stop") }, "Stop")),
     ];
     wizShell(st, g, m, right);
