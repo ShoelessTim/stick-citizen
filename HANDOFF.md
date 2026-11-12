@@ -24,9 +24,17 @@ Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. T
 
 ## Start here (next session)
 
-1. Tim runs Set up on both sticks in v3.5.0, then pastes "Copy my stick maps" into chat (Claude's folder request for %APPDATA% was blocked, so the clipboard is the route).
-2. Bake those button numbers into `data/starters/*.json` (keep labels and dots); then setup is only for people who changed their VKB config.
-3. Fix dots/names he reports from the wizard zoom, then build "Tim's layout" with him and ship it in `data/layouts/`.
+**Tim's first real run of v3.5.1 (2026-11-12): setup and Sublight both worked end to end.** What he hit:
+
+1. **Wrong grip.** Tim's sticks are the **Premium** grips; the built-in profiles and photos are the SCG Standard. Need grip detection (Premium vs Standard; device name or button/axis count) and a Premium profile + photo per hand. The picture didn't match his stick.
+2. **4-way hats behaved strangely** in the wizard. Get specifics from Tim (wrong direction order? diagonals asked for on a 4-way?).
+3. **8-way mini-stick only appeared on the left stick.** The right-hand Premium has one too (right profile lists Hat A1 there). Add it to the right Premium profile.
+4. **Mini-stick secondary (analog) mode sends two axes**, but the wizard asks for 8 hat directions in that mode and never sees the axes. Wizard needs an axis step for it: "move the mini-stick left-right, then up-down" → learn 2 axes, and treat hat mode and analog mode as two layers of one control.
+5. **Sublight: something was upside-down / inverted** (likely an axis). Ask Tim which one; fix in `data/layouts/sublight.json` or add an invert flag.
+
+Still to do after those: Tim pastes **Copy stick maps** → bake numbers into the (Premium) built-in profiles.
+
+**Process change (Tim, 2026-11-12):** never push to main. Feature branch + PR per slice; PR is done when it builds, new behavior has tests, plain-English description, and UI screenshots. Keep ≤3 unreviewed PRs open.
 
 **Parked, Tim's call:** more "inspired by" layouts (BuzZz Killer etc.). Sublight was built from the Subliminal chart Tim shared; we have no BuzZz chart, so one would be guesswork. Tim plans to ask both creators for permission once the app works; don't add more look-alikes before that.
 
