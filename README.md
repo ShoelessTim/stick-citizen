@@ -36,6 +36,23 @@ Your setup lives in `%APPDATA%\StickCitizen`, so a new version never loses it.
 
 Star Citizen can't do joystick shift layers or stick-to-mouse on its own. Set those up in your stick's firmware (VKB: VKBDevCfg). A shifted button reports as a higher button number; map it as the shift layer of its control and bind it there. Dropping an action on the lower (⇧) half of a control binds the shift layer.
 
+## Where it's going
+
+Stick Citizen started as a quick binding tester. The goal now is a polished visual binding app, what stick software should feel like: graphical, drag and drop, and smooth enough that nobody has to dig through menus.
+
+**Next up**
+- Built-in VKB Gladiator NXT EVO profiles that work out of the box, with no setup step for stock firmware.
+- Starting layouts to pick from: Sublight now, and the creator's own layout next. Others, such as Subliminal's originals, only with their creators' permission.
+- A mini-stick mode indicator showing mouse vs 8-way hat.
+
+**Planned**
+- **Setup sheet export:** build a config with the picker, then export a PDF or Markdown checklist of exactly what to change in VKBDevCfg and in Star Citizen.
+- **Troubleshooter:** "my stick won't do X". It tells you which setting to change and where.
+- **Firmware-aware modes:** use both NXT mini-sticks as analog sticks for gamepad-style on-foot play, and have modes change the stick status LEDs.
+- **LED test mode:** one LED lights on a button press, the other on axis movement.
+- **More hardware:** device profiles beyond VKB.
+- A YouTube explainer once it's ready for other people.
+
 ## Files
 
 - `stick_citizen.json` (next to the exe): settings such as `axis_order`, `deadzone`, `speech`, and device picks.

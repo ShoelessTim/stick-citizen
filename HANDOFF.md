@@ -2,7 +2,9 @@
 
 **State (2026-11-12): v3.5.0 shipped: Set up is now a one-control-at-a-time wizard (photo zooms to the control, compass shows the direction, raw "stick is sending" readout, mouse-mode hint on the mini-stick, duplicate-press check, Back / Skip / "not on my stick", diagonals that are just two directions get dropped automatically). Picking a layout before setup now offers Set up first. "Copy my stick maps" (wizard end screen and Edit bar) puts the learned numbers on the clipboard. Tim's v3.4.0 run: setup never finished because the hats were hard to tell apart on the map, so Sublight had nothing to land on. Tim confirmed both sticks are on VKB's stock profile, so his run becomes the baked default.**
 
-Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. This file is the engineering state.
+Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. This file is the engineering state. The public roadmap is in README → "Where it's going"; keep the two in step.
+
+**Direction (Nov 2026):** move from a toy tester to a polished visual binding app (drag and drop, Apple-smooth, not limited to VKB). Planned beyond the current next steps: setup sheet export (PDF/MD of VKBDevCfg + SC changes), a "which setting do I change?" troubleshooter, analog mini-sticks for on-foot play, LEDs that follow modes, an LED test mode, and more device profiles.
 
 ## What exists
 
