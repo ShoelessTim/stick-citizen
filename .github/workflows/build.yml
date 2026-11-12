@@ -34,9 +34,18 @@ jobs:
           VER="v$(python -c 'import stick_citizen; print(stick_citizen.__version__)')"
           echo "ver=$VER" >> "$GITHUB_OUTPUT"
           echo "exe=StickCitizen-$VER.exe" >> "$GITHUB_OUTPUT"
+          echo "num=${VER#v}" >> "$GITHUB_OUTPUT"
+          echo "setup=StickCitizen-$VER-Setup.exe" >> "$GITHUB_OUTPUT"
           python tools/make_version_file.py version_info.txt
       - name: Build
-        run: pyinstaller --onefile --windowed --name "StickCitizen-${{ steps.ver.outputs.ver }}" --version-file version_info.txt --add-data "stick_citizen/data;stick_citizen/data" --add-data "stick_citizen/web;stick_citizen/web" --collect-all webview run_stick_citizen.py
+        run: pyinstaller --onefile --windowed --name "StickCitizen-${{ steps.ver.outputs.ver }}" --version-file version_info.txt --icon assets/icon.ico --add-data "stick_citizen/data;stick_citizen/data" --add-data "stick_citizen/web;stick_citizen/web" --collect-all webview run_stick_citizen.py
+      - name: Installer (Start Menu + desktop icon)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc "/DAppVersion=${{ steps.ver.outputs.num }}" "/DSourceExe=..\dist\${{ steps.ver.outputs.exe }}" installer\stick-citizen.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
           name: StickCitizen-${{ steps.ver.outputs.ver }}
@@ -48,13 +57,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VER: ${{ steps.ver.outputs.ver }}
           EXE: ${{ steps.ver.outputs.exe }}
+          SETUP: ${{ steps.ver.outputs.setup }}
         run: |
           if gh release view "$VER" >/dev/null 2>&1; then echo "$VER already released"; exit 0; fi
           mkdir -p "pkg/StickCitizen-$VER"
           cp "dist/$EXE" README.md LICENSE "pkg/StickCitizen-$VER/"
           (cd pkg && 7z a "../dist/StickCitizen-$VER.zip" "StickCitizen-$VER" >/dev/null)
-          gh release create "$VER" "dist/$EXE" "dist/StickCitizen-$VER.zip" --target "$GITHUB_SHA" \
-            --title "Stick Citizen $VER" --latest --notes "**Download $EXE** below and double-click it (Windows, no install). Your setup is kept in %APPDATA%\\StickCitizen, so newer versions pick it up."
+          gh release create "$VER" "dist/$SETUP" "dist/$EXE" "dist/StickCitizen-$VER.zip" --target "$GITHUB_SHA" \
+            --title "Stick Citizen $VER" --latest --notes "**Download $SETUP** below and run it: it installs Stick Citizen with a Start Menu and desktop icon (no admin needed). Prefer no install? $EXE runs on its own. Your setup is kept in %APPDATA%\\StickCitizen, so newer versions pick it up."
       - name: Release (latest from main)
         if: github.ref == 'refs/heads/main'
         shell: bash

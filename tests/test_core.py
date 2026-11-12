@@ -247,3 +247,24 @@ def test_photo_cutout(tmp_path):
     im.save(tmp_path / "s.jpg")
     res = Image.open(cutout(tmp_path / "s.jpg", tmp_path / "s.png"))
     assert res.mode == "RGBA" and abs(res.size[0] - 100) < 25 and res.size[1] > 300   # cropped to the stick, logo gone
+
+
+def test_web_assets_carry_the_version():
+    """The page asks for app.js?v=<version> so a cached copy from an older build is never used."""
+    import stick_citizen
+    html = (Path(stick_citizen.__file__).parent / "web" / "index.html").read_text(encoding="utf-8")
+    assert f'app.js?v={stick_citizen.__version__}' in html and f'app.css?v={stick_citizen.__version__}' in html
+
+
+def test_fresh_start_backs_up_old_maps_once(tmp_path, monkeypatch):
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path))
+    from stick_citizen import paths
+    (tmp_path / "templates").mkdir()
+    (tmp_path / "templates" / "old.json").write_text("{}")
+    assert paths.fresh_start() is True
+    assert not (tmp_path / "templates").exists()
+    assert list((tmp_path / "backups").glob("*/templates/old.json"))
+    (tmp_path / "templates").mkdir()
+    (tmp_path / "templates" / "new.json").write_text("{}")
+    assert paths.fresh_start() is False                     # only once
+    assert (tmp_path / "templates" / "new.json").exists()

@@ -27,5 +27,6 @@ def main():
             "Unsaved changes", "You have bindings you haven't saved for Star Citizen. Close anyway?")
 
     window.events.closing += on_closing
-    webview.start(debug="--debug" in sys.argv)
+    # private_mode: no page cache or cookies kept between runs, so a new version never shows an old screen
+    webview.start(debug="--debug" in sys.argv, private_mode=True)
     return 0

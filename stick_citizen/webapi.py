@@ -20,7 +20,7 @@ from . import __version__, config as configmod
 from .actionmaps import find_actionmaps, load_profile
 from .bindings import ACTIVATION_MODES, BindingSet, Bound, load_catalog, mappings_dir
 from .callouts import spoken
-from .paths import migrate_legacy, user_dir
+from .paths import backup_dir, fresh_start, migrate_legacy, user_dir
 from .templates import bind_key, key_of, load_template, other_inputs, parse_key, short_label
 
 MODES = [("all", "All"), ("flight", "Flight"), ("mining", "Mining"), ("salvage", "Salvage"),
@@ -165,6 +165,7 @@ class FakeHub:
 class Api:
     def __init__(self, hub=None, actionmaps=None):
         migrate_legacy()
+        self._fresh = fresh_start()
         self._cfg = configmod.load()
         self._catalog = load_catalog()
         self._bset = BindingSet()
@@ -321,6 +322,7 @@ class Api:
             "sticks": sticks,
             "speech": bool(self._cfg.get("speech", True)),
             "input_error": getattr(self._hub, "error", ""),
+            "fresh": self._fresh,
         }
 
     def poll(self):
@@ -517,6 +519,19 @@ class Api:
         t.save()
         name = f"{c.group} {c.label}".strip() if c.group else c.label
         return self._ok(f"{name}{' ⇧' if layer == 'shift' else ''} = {short_label(key)}")
+
+    def reset_stick(self, slot):
+        """Start a stick's map over from the built-in profile. The old map goes to backups/."""
+        s = self._slot(slot)
+        t = self._tpl(slot)
+        if not s or t is None:
+            return {"ok": False, "msg": "No such stick"}
+        if t.path and Path(t.path).is_file():
+            import shutil
+            shutil.move(str(t.path), str(backup_dir() / Path(t.path).name))
+        self._templates.pop(s["name"], None)
+        self._seen.pop(s["slot"], None)
+        return self._ok("Started over. Your old map is in the backups folder.")
 
     def set_dot(self, slot, cid, fx, fy):
         t = self._tpl(slot)

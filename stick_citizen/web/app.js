@@ -89,6 +89,7 @@ async function boot() {
   await refresh();
   S.stick = sticks().length > 1 ? "both" : (sticks()[0] || {}).slot;
   render();
+  if (S.state.fresh) toast("Fresh start: older stick maps were moved to the backups folder. Run Set up.");
   pollLoop();
 }
 let booted = false;
@@ -850,6 +851,25 @@ function toast(msg) {
   toastT = setTimeout(() => (t.hidden = true), 3200);
 }
 
+/* wipe one stick's learned map back to the built-in profile, then run setup */
+function resetFlow() {
+  const go = async (st) => {
+    closeModal();
+    const res = await API.reset_stick(st.slot);
+    delete S.images[st.name];
+    await refresh();
+    render();
+    if (res.msg) toast(res.msg);
+    const fresh = stickBySlot(st.slot);
+    if (fresh && fresh.unassigned.length) setupFlow(fresh);
+  };
+  modal([h("h2", {}, "Start a stick over"),
+    h("p", {}, "Forgets the buttons Stick Citizen learned for that stick and runs Set up again. The old map is kept in the backups folder. Your bindings are not touched."),
+    h("div", { class: "lay-list" }, sticks().map((st) => h("button", { class: "lay", onclick: () => go(st) },
+      h("b", {}, `${sideName(st)[0].toUpperCase() + sideName(st).slice(1)} stick`), h("span", {}, st.name)))),
+    h("div", { class: "row" }, h("button", { class: "btn", onclick: closeModal }, "Cancel"))]);
+}
+
 async function layoutsFlow() {
   const list = await API.list_layouts();
   const pick = async (l, force) => {
@@ -893,10 +913,13 @@ function wire() {
   const setupBtn = h("button", { class: "chip setup", id: "btnSetup", onclick: () => {
     const s = shown().find((x) => x.unassigned.length) ; if (s) setupFlow(s); } }, "");
   $(".bar").insertBefore(setupBtn, $("#hint"));
+  const resetBtn = h("button", { class: "chip", id: "btnReset", onclick: resetFlow }, "Start a stick over");
+  $(".bar").insertBefore(resetBtn, $("#hint"));
+  resetBtn.hidden = true;
   const copyBtn = h("button", { class: "chip", id: "btnCopyMaps", onclick: copyMaps }, "Copy stick maps");
   $(".bar").insertBefore(copyBtn, $("#hint"));
   copyBtn.hidden = true;
-  const obs = new MutationObserver(() => { mapBtn.hidden = copyBtn.hidden = S.view !== "edit"; });
+  const obs = new MutationObserver(() => { mapBtn.hidden = copyBtn.hidden = resetBtn.hidden = S.view !== "edit"; });
   obs.observe($("#app"), { attributes: true, attributeFilter: ["class"] });
   mapBtn.hidden = true;
 }

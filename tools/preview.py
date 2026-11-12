@@ -86,7 +86,7 @@ window.MOCK_API = (() => {
     search: (q) => Promise.resolve(F.search.filter(a => !q || (a.label + a.group).toLowerCase().includes(q.toLowerCase())).slice(0, 80)),
     assign: () => ok("Bound"), remove: () => ok(), set_activation: () => ok(), undo: () => ok("Undone"),
     arm_capture: () => Promise.resolve({ ok: true }), cancel_capture: () => Promise.resolve({ ok: true }),
-    map_control: () => ok("Mapped"), assign_input: () => ok("Learned"), learn: () => ok("Learned"), set_dot: () => Promise.resolve({ ok: true }),
+    map_control: () => ok("Mapped"), assign_input: () => ok("Learned"), learn: () => ok("Learned"), reset_stick: () => ok("Started over"), set_dot: () => Promise.resolve({ ok: true }),
     edit_control: () => ok(), choose_photo: () => Promise.resolve({ ok: false }), open_layout: () => Promise.resolve({ ok: false }),
     save_layout: () => ok("Saved"), fly_test: () => ok("Ring course launched"), say: () => Promise.resolve({}),
     set_speech: () => Promise.resolve({ ok: true }),
@@ -105,7 +105,7 @@ def write_site(state, images, search, site: Path):
     (site / "fixture.js").write_text("window.FIXTURE = " + json.dumps(
         {"state": state, "images": images, "search": search, "axes": axes, "layouts": state.pop("layouts")}) + ";\n" + MOCK, encoding="utf-8")
     html = (site / "index.html").read_text(encoding="utf-8")
-    (site / "index.html").write_text(html.replace('<script src="app.js">', '<script src="fixture.js"></script>\n<script src="app.js">'), encoding="utf-8")
+    (site / "index.html").write_text(html.replace('<script src="app.js', '<script src="fixture.js"></script>\n<script src="app.js'), encoding="utf-8")
 
 
 def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
