@@ -1,4 +1,6 @@
-from stick_citizen.app import main
+import sys
+
+from stick_citizen.launcher import main
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

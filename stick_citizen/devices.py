@@ -56,6 +56,8 @@ class DeviceManager:
                              if i not in used and want in d.name.lower()), None)
             if pick is None:  # SC normally sees vJoy, so fall back to the next vJoy device
                 pick = next((i for i, d in enumerate(self.devices) if i not in used and d.is_vjoy), None)
+            if pick is None:  # direct path: SC sees the sticks themselves, in Windows order
+                pick = next((i for i in range(len(self.devices)) if i not in used), None)
             if pick is not None:
                 self.instance_map[inst] = pick
                 used.add(pick)

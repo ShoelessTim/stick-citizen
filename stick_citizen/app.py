@@ -61,7 +61,7 @@ def held_flag(action: str):
 
 
 class App:
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = False, bindings_path: str | None = None):
         self.cfg = configmod.load()
         self.headless = headless
         pygame.init()
@@ -99,7 +99,7 @@ class App:
         self.last_poll = 0.0
 
         self.devices.refresh()
-        self.load_bindings(self.cfg.get("actionmaps_path") or find_actionmaps(), announce=False)
+        self.load_bindings(bindings_path or self.cfg.get("actionmaps_path") or find_actionmaps(), announce=False)
 
     # ---------- bindings ----------
     def load_bindings(self, path, announce=True):
@@ -500,8 +500,8 @@ def _wrap(s, n):
     return lines
 
 
-def main():
-    App().run()
+def main(bindings_path: str | None = None):
+    App(bindings_path=bindings_path).run()
 
 
 if __name__ == "__main__":

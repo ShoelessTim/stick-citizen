@@ -57,3 +57,56 @@ def test_app_smoke(monkeypatch, tmp_path):
     app = App(headless=True)
     app.load_bindings(str(DEMO), announce=False)
     app.run(max_frames=30)
+
+
+def test_bindingset_roundtrip(tmp_path):
+    from stick_citizen.actionmaps import parse_actionmaps
+    from stick_citizen.bindings import BindingSet, load_catalog
+
+    bs = BindingSet.from_profile(load_profile(DEMO))
+    n = bs.count()
+    # moving an action takes it off its old input
+    bs.assign((1, "button", 9, ""), "spaceship_general", "v_toggle_landing_system", "tap")
+    assert bs.at((2, "button", 6, "")) == []
+    assert bs.where("spaceship_general", "v_toggle_landing_system") == (1, "button", 9, "")
+    assert bs.count() == n and bs.dirty
+    bs.undo()
+    assert bs.where("spaceship_general", "v_toggle_landing_system") == (2, "button", 6, "")
+    xml = bs.to_xml("My HOSAS")
+    again = parse_actionmaps(xml)
+    assert again.name == "My-HOSAS"
+    assert len(again.bindings) == n
+    assert again.lookup((2, "button", 9, ""))[0].modifiers == ("lalt",)
+    assert again.lookup((2, "button", 5, ""))[0].activation == "double_tap"
+    cat = load_catalog()
+    assert len(cat.actions) > 500 and cat.is_axis("spaceship_movement", "v_pitch")
+
+
+def test_templates(tmp_path, monkeypatch):
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    t = templates.load_template("VKBsim Gladiator EVO R", 6, 2, 40)
+    assert {"a0", "h1u", "h2r", "b40"} <= set(t.tiles)
+    t.tiles["b1"] = [500, 20]
+    t.save()
+    assert templates.load_template("VKBsim Gladiator EVO R", 6, 2, 40).tiles["b1"] == [500, 20]
+    assert templates.parse_tile_key("h12l") == ("hat", 12, "left")
+
+
+def test_editor_smoke(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.chdir(tmp_path)
+    from PySide6 import QtWidgets
+    from stick_citizen import qt_app
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    w = qt_app.MainWindow()
+    w.load_path(str(DEMO))
+    w.assign((1, "button", 7, ""), "spaceship_missiles", "v_weapon_launch_missile")
+    assert w.bset.at((1, "button", 7, ""))[0].action == "v_weapon_launch_missile"
+    w.toggle_edit(True)
+    v = w.views[1]
+    v.tiles["b7"].setPos(400, 12)
+    v.save_positions()
+    assert (tmp_path / "templates").exists()
+    w.bset.dirty = False
+    w.close()
