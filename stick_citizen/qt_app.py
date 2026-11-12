@@ -14,7 +14,7 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame  # noqa: E402
 from PySide6 import QtCore, QtGui, QtWidgets  # noqa: E402
 
-from . import config as configmod  # noqa: E402
+from . import __version__, config as configmod  # noqa: E402
 from .actionmaps import AXIS_NAMES, find_actionmaps, load_profile  # noqa: E402
 from .bindings import ACTIVATION_MODES, BindingSet, load_catalog, mappings_dir  # noqa: E402
 from .callouts import spoken  # noqa: E402
@@ -484,7 +484,7 @@ class MainWindow(QtWidgets.QMainWindow):
             v.scene().update()
         self.palette.refresh(self.bset)
         name = Path(self.loaded_path).name if self.loaded_path else "new layout"
-        self.setWindowTitle(f"Stick Citizen — {name}{' •' if self.bset.dirty else ''}")
+        self.setWindowTitle(f"Stick Citizen {__version__} — {name}{' •' if self.bset.dirty else ''}")
         self.status.showMessage(f"{self.bset.count()} joystick bindings · {len(self.catalog.actions)} SC actions"
                                 f" (SC {self.catalog.sc_version}) · {len(self.devices.devices)} controllers")
 

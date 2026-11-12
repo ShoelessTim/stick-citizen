@@ -2,9 +2,11 @@
 
 See your HOSAS on screen, drag Star Citizen actions onto it, fly-test it, and save a layout SC can import. No Joystick Gremlin required.
 
-## Run it
+## ⬇ Download
 
-Download `StickCitizen.exe` from the [latest release](../../releases/tag/latest) and double-click it. No install.
+**[Download StickCitizen.exe](https://github.com/shoelesstim/stick-citizen/releases/latest/download/StickCitizen.exe)** (Windows) and double-click it. No install.
+
+All versions and the zip package: [Releases](https://github.com/shoelesstim/stick-citizen/releases).
 
 ## Build your bindings
 

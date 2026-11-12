@@ -1,2 +1,2 @@
-"""Stick Citizen: test Star Citizen HOSAS bindings without launching SC."""
-__version__ = "0.1.0"
+"""Stick Citizen: see, edit and fly-test Star Citizen HOSAS bindings."""
+__version__ = "2.1.0"
