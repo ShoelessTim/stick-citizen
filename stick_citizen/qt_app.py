@@ -19,7 +19,8 @@ from .actionmaps import AXIS_NAMES, find_actionmaps, load_profile  # noqa: E402
 from .bindings import ACTIVATION_MODES, BindingSet, load_catalog, mappings_dir  # noqa: E402
 from .callouts import spoken  # noqa: E402
 from .devices import DeviceManager, hat_dirs  # noqa: E402
-from .templates import TILE_H, TILE_W, auto_layout, load_template, parse_tile_key, tile_key  # noqa: E402
+from .templates import (COLS, CONTROL_H, GAP, TILE_H, TILE_W, auto_layout, load_template,  # noqa: E402
+                        other_inputs, parse_tile_key)
 
 MIME = "application/x-sc-action"
 
@@ -157,51 +158,75 @@ class Palette(QtWidgets.QWidget):
 
 
 # ---------------------------------------------------------------- tiles
-class Tile(QtWidgets.QGraphicsObject):
-    def __init__(self, view, tkey):
+class BaseTile(QtWidgets.QGraphicsObject):
+    """Shared look and behaviour. A tile shows one or more inputs (rows); a control tile has a shift row."""
+
+    def __init__(self, view):
         super().__init__()
         self.view = view
-        self.tkey = tkey
-        self.kind, self.index, self.direction = parse_tile_key(tkey)
-        self.w = TILE_W * (0.62 if self.kind == "hat" else 1)
-        self.h = TILE_H
-        self.active = False
+        self.w, self.h = TILE_W, TILE_H
+        self.active_keys = set()
         self.value = 0.0
         self.flash_t = 0.0
+        self.drop_key = None
         self.setAcceptDrops(True)
         self.setAcceptHoverEvents(True)
-        self.drop_hover = False
         self.setCursor(QtCore.Qt.PointingHandCursor)
-        self.setFlag(QtWidgets.QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable, True)
+
+    # subclasses: rows() -> [(key, prefix)], title() -> str, kind
+    kind = "button"
+    movable = True
+
+    def keys(self):
+        return [k for k, _ in self.rows()]
+
+    def key_at(self, pos):
+        rows = self.rows()
+        if len(rows) == 1:
+            return rows[0][0]
+        return rows[1][0] if pos.y() > 15 + 18 + 1 else rows[0][0]
 
     @property
-    def key(self):
-        return (self.view.instance, self.kind, self.index, self.direction)
+    def active(self):
+        return bool(self.active_keys)
+
+    def set_key_active(self, key, on):
+        if on:
+            self.active_keys.add(key)
+            self.flash_t = time.time()
+        else:
+            self.active_keys.discard(key)
+        self.update()
 
     def boundingRect(self):
         return QtCore.QRectF(0, 0, self.w, self.h)
 
     def paint(self, p, opt, widget=None):
-        binds = self.view.main.bset.at(self.key)
+        main = self.view.main
+        rows = [(k, pre, main.bset.at(k)) for k, pre in self.rows()]
+        any_bound = any(b for _, _, b in rows)
+        crowded = any(len(b) > 1 for _, _, b in rows)
         r = self.boundingRect().adjusted(1, 1, -1, -1)
-        fill = TILE_BOUND if binds else TILE
         flash = max(0.0, 1.0 - (time.time() - self.flash_t) / 0.6)
-        if self.active or flash > 0:
-            fill = QtGui.QColor(40, 120, 80) if self.active else fill
-        if self.drop_hover:
-            fill = QtGui.QColor(60, 90, 140)
-        p.setRenderHint(QtGui.QPainter.Antialiasing)
-        fill = QtGui.QColor(fill)
-        if self.view.main.has_backdrop(self.view):
+        fill = QtGui.QColor(40, 120, 80) if self.active else QtGui.QColor(TILE_BOUND if any_bound else TILE)
+        if main.has_backdrop(self.view):
             fill.setAlpha(225)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
         p.setBrush(fill)
-        edge = ACCENT if len(binds) > 1 else (GOOD if self.active else QtGui.QColor(60, 68, 86))
+        edge = ACCENT if crowded else (GOOD if self.active else QtGui.QColor(60, 68, 86))
         if flash > 0:
             edge = GOOD
         if self.isSelected():
             edge = HOT
-        p.setPen(QtGui.QPen(edge, 2 if (len(binds) > 1 or self.isSelected() or flash) else 1))
+        p.setPen(QtGui.QPen(edge, 2 if (crowded or self.isSelected() or flash) else 1))
         p.drawRoundedRect(r, 6, 6)
+        if self.drop_key is not None:
+            i = self.keys().index(self.drop_key) if self.drop_key in self.keys() else 0
+            band = QtCore.QRectF(r.left() + 2, r.top() + 15 + i * 18 - 1, r.width() - 4, 19) if len(rows) > 1 else r
+            p.setPen(QtCore.Qt.NoPen)
+            p.setBrush(QtGui.QColor(60, 90, 140))
+            p.drawRoundedRect(band, 4, 4)
         if self.kind == "axis":
             v = max(-1.0, min(1.0, self.value))
             bar = QtCore.QRectF(r.left() + 4, r.bottom() - 6, (r.width() - 8), 3)
@@ -213,50 +238,65 @@ class Tile(QtWidgets.QGraphicsObject):
             p.drawRect(QtCore.QRectF(min(mid, mid + v * bar.width() / 2), bar.top(), abs(v) * bar.width() / 2, 3))
         f = p.font()
         f.setPointSizeF(7.5)
+        f.setBold(False)
         p.setFont(f)
         p.setPen(DIM)
-        title = input_label(self.kind, self.index, self.direction)
-        if self.kind == "hat":
-            title = title.replace("Hat ", "H")
-        p.drawText(r.adjusted(6, 2, -4, 0), QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop, title)
-        f.setPointSizeF(8.5)
-        f.setBold(True)
-        p.setFont(f)
-        p.setPen(FG if binds else DIM)
-        if binds:
-            cat = self.view.main.catalog
-            first = cat.label(binds[0].map, binds[0].action)
-            if binds[0].activation:
-                first += f" · {binds[0].activation.replace('_', ' ')}"
-            text = first + (f"  +{len(binds) - 1}" if len(binds) > 1 else "")
-        else:
-            text = "—"
-        p.drawText(r.adjusted(6, 15, -4, -6), QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
-                   p.fontMetrics().elidedText(text, QtCore.Qt.ElideRight, int(r.width() - 10)))
+        p.drawText(r.adjusted(6, 2, -4, 0), QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop,
+                   p.fontMetrics().elidedText(self.title(), QtCore.Qt.ElideRight, int(r.width() - 10)))
+        cat = main.catalog
+        for i, (key, pre, binds) in enumerate(rows):
+            f.setPointSizeF(8.5 if i == 0 else 8.0)
+            f.setBold(i == 0)
+            p.setFont(f)
+            if key in self.active_keys:
+                p.setPen(GOOD)
+            else:
+                p.setPen(FG if binds else DIM)
+            if binds:
+                text = cat.label(binds[0].map, binds[0].action)
+                if binds[0].activation:
+                    text += f" · {binds[0].activation.replace('_', ' ')}"
+                if len(binds) > 1:
+                    text += f"  +{len(binds) - 1}"
+            else:
+                text = "—"
+            row = QtCore.QRectF(r.left() + 6, r.top() + 15 + i * 18, r.width() - 10, 18)
+            p.drawText(row, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                       p.fontMetrics().elidedText(pre + text, QtCore.Qt.ElideRight, int(row.width())))
 
     def hoverEnterEvent(self, e):
-        binds = self.view.main.bset.at(self.key)
-        cat = self.view.main.catalog
-        lines = [f"js{self.view.instance} {input_label(self.kind, self.index, self.direction)}"]
-        lines += [f"• {cat.label(b.map, b.action)}" + (f" ({b.activation})" if b.activation else "") for b in binds]
+        main = self.view.main
+        lines = [self.title()]
+        for key, pre in self.rows():
+            for b in main.bset.at(key):
+                lines.append(f"{pre or '• '}{main.catalog.label(b.map, b.action)}"
+                             + (f" ({b.activation})" if b.activation else ""))
         self.setToolTip("\n".join(lines))
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasFormat(MIME):
             e.acceptProposedAction()
-            self.drop_hover = True
+            self.drop_key = self.key_at(e.pos())
             self.update()
         else:
             e.ignore()
 
+    def dragMoveEvent(self, e):
+        k = self.key_at(e.pos())
+        if k != self.drop_key:
+            self.drop_key = k
+            self.update()
+        e.acceptProposedAction()
+
     def dragLeaveEvent(self, e):
-        self.drop_hover = False
+        self.drop_key = None
         self.update()
 
     def dropEvent(self, e):
-        self.drop_hover = False
+        key = self.key_at(e.pos())
+        self.drop_key = None
         mapname, action = bytes(e.mimeData().data(MIME)).decode().split("|", 1)
-        self.view.main.assign(self.key, mapname, action)
+        self.view.main.assign(key, mapname, action)
         e.acceptProposedAction()
 
     def contextMenuEvent(self, e):
@@ -264,13 +304,99 @@ class Tile(QtWidgets.QGraphicsObject):
 
     def mousePressEvent(self, e):
         if e.button() == QtCore.Qt.LeftButton and not self.view.main.edit_layout:
-            self.view.main.on_tile_click(self)
+            self.view.main.on_tile_click(self, self.key_at(e.pos()))
         super().mousePressEvent(e)
 
     def mouseReleaseEvent(self, e):
         super().mouseReleaseEvent(e)
-        if self.view.main.edit_layout:
+        if self.view.main.edit_layout and self.movable:
             self.view.save_positions()
+
+
+class Tile(BaseTile):
+    """One input: an axis, a hat direction, or a stray button number in the Other inputs drawer."""
+
+    def __init__(self, view, tkey, in_drawer=False):
+        super().__init__(view)
+        self.tkey = tkey
+        self.kind, self.index, self.direction = parse_tile_key(tkey)
+        self.movable = not in_drawer
+        if self.kind == "hat":
+            self.w = TILE_W * 0.62
+
+    @property
+    def key(self):
+        return (self.view.instance, self.kind, self.index, self.direction)
+
+    def rows(self):
+        return [(self.key, "")]
+
+    def title(self):
+        t = input_label(self.kind, self.index, self.direction)
+        return t.replace("Hat ", "H") if self.kind == "hat" else t
+
+
+class ControlTile(BaseTile):
+    """A physical control from the device template; one row per layer (base, then shift)."""
+
+    def __init__(self, view, control):
+        super().__init__(view)
+        self.control = control
+        self.h = CONTROL_H if "shift" in control.inputs else TILE_H
+
+    def rows(self):
+        inst = self.view.instance
+        out = [((inst, "button", self.control.inputs["base"], ""), "")] if "base" in self.control.inputs else []
+        if "shift" in self.control.inputs:
+            out.append(((inst, "button", self.control.inputs["shift"], ""), "⇧ "))
+        return out
+
+    def title(self):
+        nums = " · ".join(("⇧" if layer == "shift" else "") + f"B{n}"
+                          for layer, n in sorted(self.control.inputs.items()))
+        return f"{self.control.label}   {nums}"
+
+
+class DrawerHeader(QtWidgets.QGraphicsObject):
+    """Click to show or hide button numbers that no physical control owns."""
+
+    def __init__(self, view, count):
+        super().__init__()
+        self.view = view
+        self.count = count
+        self.flash_t = 0.0
+        self.w = COLS * (TILE_W + GAP) - GAP
+        self.h = 26
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setToolTip("Button numbers your stick reports that aren't mapped to a physical control: "
+                        "shift layers, hat-as-buttons, tempo pulses. Only ones that are bound or have fired show here.")
+
+    def boundingRect(self):
+        return QtCore.QRectF(0, 0, self.w, self.h)
+
+    def paint(self, p, opt, widget=None):
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        flash = max(0.0, 1.0 - (time.time() - self.flash_t) / 0.8)
+        p.setPen(QtGui.QPen(GOOD if flash else QtGui.QColor(42, 48, 64), 1))
+        p.setBrush(QtGui.QColor(22, 26, 36))
+        p.drawRoundedRect(self.boundingRect().adjusted(0.5, 0.5, -0.5, -0.5), 6, 6)
+        f = p.font()
+        f.setPointSizeF(8.5)
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(DIM)
+        arrow = "▾" if self.view.drawer_open else "▸"
+        p.drawText(self.boundingRect().adjusted(10, 0, -10, 0), QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter,
+                   f"{arrow}  Other inputs · {self.count}")
+        f.setBold(False)
+        f.setPointSizeF(7.5)
+        p.setFont(f)
+        p.drawText(self.boundingRect().adjusted(10, 0, -10, 0), QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter,
+                   "button numbers not on a physical control")
+
+    def mousePressEvent(self, e):
+        self.view.drawer_open = not self.view.drawer_open
+        self.view.layout_drawer()
 
 
 class DeviceView(QtWidgets.QGraphicsView):
@@ -282,30 +408,39 @@ class DeviceView(QtWidgets.QGraphicsView):
         self.setBackgroundBrush(PANEL)
         self.setRenderHint(QtGui.QPainter.Antialiasing)
         self.setAcceptDrops(True)
-        self.tiles = {}
+        self.tiles = {}            # axis + hat tiles by tile key
+        self.control_tiles = {}    # control id -> ControlTile
+        self.other_tiles = {}      # button number -> Tile (drawer)
+        self.header = None
+        self.drawer_open = None
         self.template = None
         self.backdrop = None
+        self.num_buttons = None
+
+    def all_tiles(self):
+        return list(self.tiles.values()) + list(self.control_tiles.values()) + list(self.other_tiles.values())
 
     def build(self, device):
         sc = self.scene()
         sc.clear()
-        self.tiles = {}
+        self.tiles, self.control_tiles, self.other_tiles, self.header = {}, {}, {}, None
         self.backdrop = None
         if device is not None:
-            name, na, nh, nb = device.name, device.num_axes, device.num_hats, device.num_buttons
+            name, na, nh, self.num_buttons = device.name, device.num_axes, device.num_hats, device.num_buttons
         else:
             used = [k for k in self.main.bset.binds if k[0] == self.instance]
-            nb = max([k[2] for k in used if k[1] == "button"] + [32])
             nh = max([k[2] for k in used if k[1] == "hat"] + [2])
-            name, na = f"js{self.instance} (no device)", 6
-        self.template = load_template(name, na, nh, nb)
+            name, na, self.num_buttons = f"js{self.instance} (no device)", 6, None
+        self.template = load_template(name, na, nh)
+        if self.drawer_open is None:
+            self.drawer_open = not self.template.controls
         img = self.template.image_path()
         if img:
             pm = QtGui.QPixmap(str(img))
             if not pm.isNull():
                 self.backdrop = sc.addPixmap(pm)
                 self.backdrop.setZValue(-10)
-        valid = set(auto_layout(na, nh, nb))
+        valid = set(auto_layout(na, nh))
         for k, pos in self.template.tiles.items():
             if k not in valid:
                 continue
@@ -313,10 +448,67 @@ class DeviceView(QtWidgets.QGraphicsView):
             t.setPos(*pos)
             sc.addItem(t)
             self.tiles[k] = t
+        for c in self.template.controls:
+            t = ControlTile(self, c)
+            t.setPos(*c.pos)
+            sc.addItem(t)
+            self.control_tiles[c.id] = t
+        self.layout_drawer(fit=False)
         self.set_editable(self.main.edit_layout)
+        self.fit()
+
+    def bound_buttons(self):
+        return {k[2] for k, v in self.main.bset.binds.items() if v and k[0] == self.instance and k[1] == "button"}
+
+    def layout_drawer(self, fit=True):
+        sc = self.scene()
+        for t in self.other_tiles.values():
+            sc.removeItem(t)
+        if self.header is not None:
+            sc.removeItem(self.header)
+        self.other_tiles, self.header = {}, None
+        nums = other_inputs(self.template, self.bound_buttons(), self.main.seen.get(self.instance, set()),
+                            self.num_buttons)
+        if nums:
+            fixed = list(self.tiles.values()) + list(self.control_tiles.values())
+            y = max([t.pos().y() + t.h for t in fixed] + [0]) + GAP * 3
+            self.header = DrawerHeader(self, len(nums))
+            self.header.setPos(0, y)
+            sc.addItem(self.header)
+            if self.drawer_open:
+                for i, n in enumerate(nums):
+                    t = Tile(self, f"b{n}", in_drawer=True)
+                    t.setPos((i % COLS) * (TILE_W + GAP), y + 26 + GAP + (i // COLS) * (TILE_H + GAP))
+                    sc.addItem(t)
+                    self.other_tiles[n] = t
         rect = sc.itemsBoundingRect().adjusted(-12, -12, 12, 12)
         sc.setSceneRect(rect)
-        self.fit()
+        if fit:
+            self.fit()
+
+    def button_changed(self, n, on):
+        """Light whatever shows button n. Returns (tile or None, binding key)."""
+        key = (self.instance, "button", n, "")
+        c, _layer = self.template.control_for(n)
+        if c:
+            tile = self.control_tiles.get(c.id)
+        else:
+            tile = self.other_tiles.get(n)
+            if tile is None and on:
+                seen = self.main.seen.setdefault(self.instance, set())
+                if n not in seen:
+                    seen.add(n)
+                    self.layout_drawer()
+                    tile = self.other_tiles.get(n)
+                if tile is None and self.header is not None:
+                    self.header.flash_t = time.time()
+                    self.header.update()
+        if tile is not None:
+            tile.set_key_active(key, on)
+        return tile, key
+
+    def selected_control(self):
+        return next((t.control for t in self.control_tiles.values() if t.isSelected()), None)
 
     def fit(self):
         r = self.scene().sceneRect()
@@ -332,10 +524,9 @@ class DeviceView(QtWidgets.QGraphicsView):
         self.fit()
 
     def set_editable(self, on):
-        for t in self.tiles.values():
-            t.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, on)
-            t.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable, True)
-            t.setCursor(QtCore.Qt.SizeAllCursor if on else QtCore.Qt.PointingHandCursor)
+        for t in self.all_tiles():
+            t.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, on and t.movable)
+            t.setCursor(QtCore.Qt.SizeAllCursor if on and t.movable else QtCore.Qt.PointingHandCursor)
 
     def save_positions(self):
         if not self.template:
@@ -345,8 +536,12 @@ class DeviceView(QtWidgets.QGraphicsView):
             x, y = round(t.pos().x() / grid) * grid, round(t.pos().y() / grid) * grid
             t.setPos(x, y)
             self.template.tiles[k] = [x, y]
+        for t in self.control_tiles.values():
+            x, y = round(t.pos().x() / grid) * grid, round(t.pos().y() / grid) * grid
+            t.setPos(x, y)
+            t.control.pos = [x, y]
         self.template.save()
-        self.scene().setSceneRect(self.scene().itemsBoundingRect().adjusted(-12, -12, 12, 12))
+        self.layout_drawer(fit=False)
 
 
 # ---------------------------------------------------------------- main window
@@ -360,6 +555,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.loaded_mtime = 0.0
         self.edit_layout = False
         self.bind_by_press = False
+        self.map_mode = False
+        self.seen = {}   # SC instance -> button numbers seen firing this session
         from .speech import Speaker
         self.speaker = Speaker(enabled=self.cfg.get("speech", True))
 
@@ -403,6 +600,9 @@ class MainWindow(QtWidgets.QMainWindow):
         act("Undo", self.undo, "Ctrl+Z")
         self.a_press = act("Bind by pressing", self.toggle_press, checkable=True,
                            tip="Select an action on the left, then press a stick button to bind it")
+        self.a_map = act("Map controls", self.toggle_map, checkable=True,
+                         tip="Press each physical control and name it. Press it again with your shift "
+                             "button held to add its shift layer.")
         self.a_edit = act("Edit layout", self.toggle_edit, checkable=True,
                           tip="Drag tiles to match your stick; saved as a device template")
         self.a_bg = act("Set stick photo…", self.set_backdrop, tip="Put a photo of your stick behind the tiles")
@@ -537,38 +737,142 @@ class MainWindow(QtWidgets.QMainWindow):
                 return
         old = self.bset.where(mapname, action)
         self.bset.assign(key, mapname, action, "" if is_axis_input else cat.default_activation(mapname, action))
-        moved = f" (moved from js{old[0]} {input_label(*old[1:])})" if old and old != key else ""
+        oldv = self.views.get(old[0]) if old else None
+        moved = (f" (moved from js{old[0]} {self.input_name(oldv, old) if oldv else input_label(*old[1:])})"
+                 if old and old != key else "")
         others = len(self.bset.at(key)) - 1
         colour = ACCENT if others else GOOD
-        msg = f"{cat.label(mapname, action)} → js{key[0]} {input_label(*key[1:])}{moved}"
+        v = self.views.get(key[0])
+        msg = f"{cat.label(mapname, action)} → js{key[0]} {self.input_name(v, key) if v else input_label(*key[1:])}{moved}"
         if others:
             msg += f"   [{others + 1} actions share this input]"
         self.callout(msg, colour)
+        if v is not None:
+            v.layout_drawer()
         self.refresh_all()
+
+    def input_name(self, view, key):
+        """Human name for a binding key: the physical control (and layer) when mapped."""
+        if key[1] == "button" and view.template:
+            c, layer = view.template.control_for(key[2])
+            if c:
+                return c.label + (" ⇧" if layer == "shift" else "")
+        return input_label(*key[1:])
 
     def tile_menu(self, tile, pos):
         m = QtWidgets.QMenu(self)
-        binds = list(self.bset.at(tile.key))
         cat = self.catalog
-        if not binds:
-            a = m.addAction("Unbound — drag an action here")
-            a.setEnabled(False)
-        for b in binds:
-            sub = m.addMenu(cat.label(b.map, b.action))
-            if tile.kind != "axis":
-                am = sub.addMenu("Activation")
-                for mode in ACTIVATION_MODES:
-                    x = am.addAction(mode.replace("_", " ") or "(game default)")
-                    x.setCheckable(True)
-                    x.setChecked(mode == b.activation)
-                    x.triggered.connect(lambda _c=False, b=b, mode=mode: self._set_act(tile.key, b, mode))
-            rm = sub.addAction("Remove")
-            rm.triggered.connect(lambda _c=False, b=b: self._remove(tile.key, b))
-        if binds:
+        rows = tile.rows()
+        for key, _pre in rows:
+            binds = list(self.bset.at(key))
+            if len(rows) > 1:
+                m.addSection(self.input_name(tile.view, key))
+            if not binds:
+                a = m.addAction("Unbound — drag an action here")
+                a.setEnabled(False)
+            for b in binds:
+                sub = m.addMenu(cat.label(b.map, b.action))
+                if tile.kind != "axis":
+                    am = sub.addMenu("Activation")
+                    for mode in ACTIVATION_MODES:
+                        x = am.addAction(mode.replace("_", " ") or "(game default)")
+                        x.setCheckable(True)
+                        x.setChecked(mode == b.activation)
+                        x.triggered.connect(lambda _c=False, k=key, b=b, mode=mode: self._set_act(k, b, mode))
+                rm = sub.addAction("Remove")
+                rm.triggered.connect(lambda _c=False, k=key, b=b: self._remove(k, b))
+            if binds:
+                clr = m.addAction("Clear this input")
+                clr.triggered.connect(lambda _c=False, k=key: (self.bset.clear(k), self.refresh_all()))
+        if isinstance(tile, ControlTile):
             m.addSeparator()
-            clr = m.addAction("Clear this input")
-            clr.triggered.connect(lambda: (self.bset.clear(tile.key), self.refresh_all()))
+            c, view = tile.control, tile.view
+            m.addAction("Rename control…").triggered.connect(lambda: self.rename_control(view, c))
+            if "shift" in c.inputs:
+                m.addAction("Remove shift layer").triggered.connect(lambda: self.edit_control(view, c, drop_shift=True))
+            m.addAction("Remove control (numbers go to Other inputs)").triggered.connect(
+                lambda: self.edit_control(view, c, delete=True))
         m.exec(pos)
+
+    # ----- mapping physical controls -----
+    def toggle_map(self, on):
+        self.map_mode = on
+        if on and self.bind_by_press:
+            self.a_press.setChecked(False)
+            self.bind_by_press = False
+        self.callout("Map controls: press each control on your stick and name it. "
+                     "Select it, then press it with shift held to add the shift layer." if on else "Map saved", HOT)
+
+    def _modal(self, fn):
+        """Run a dialog with input polling paused, so held buttons don't re-fire behind it."""
+        self.timer.stop()
+        try:
+            return fn()
+        finally:
+            self.timer.start(16)
+
+    def map_button(self, view, n):
+        t = view.template
+        c, layer = t.control_for(n)
+        if c:
+            self._select_control(view, c.id)
+            self.callout(f"{c.label}{' ⇧' if layer == 'shift' else ''} — already mapped (B{n})", DIM)
+            return False
+        sel = view.selected_control()
+        choice = "new"
+        if sel and "shift" not in sel.inputs:
+            box = QtWidgets.QMessageBox(self)
+            box.setWindowTitle("Shift layer?")
+            box.setText(f"Button {n} fired. Is that “{sel.label}” with shift held?")
+            b_shift = box.addButton(f"Shift layer of {sel.label}", QtWidgets.QMessageBox.YesRole)
+            b_new = box.addButton("New control", QtWidgets.QMessageBox.NoRole)
+            box.addButton(QtWidgets.QMessageBox.Cancel)
+            self._modal(box.exec)
+            clicked = box.clickedButton()
+            choice = "shift" if clicked is b_shift else "new" if clicked is b_new else None
+        if choice == "shift":
+            t.set_layer(sel, "shift", n)
+            cid, msg = sel.id, f"{sel.label} ⇧ = B{n}"
+        elif choice == "new":
+            name, ok = self._modal(lambda: QtWidgets.QInputDialog.getText(
+                self, "Name this control", f"js{view.instance} button {n} — what is it on the stick?\n"
+                "(e.g. Trigger, Pinky, A2 hat push, Thumb button)", text=f"Button {n}"))
+            if not ok:
+                return False
+            c = t.add_control(name, n)
+            cid, msg = c.id, f"{c.label} = B{n}"
+        else:
+            return False
+        t.save()
+        view.build(self.devices.device_for(view.instance))
+        self._select_control(view, cid)
+        self.callout(msg, GOOD)
+        self.refresh_all()
+        return True
+
+    def _select_control(self, view, cid):
+        for x in view.all_tiles():
+            x.setSelected(False)
+        tile = view.control_tiles.get(cid)
+        if tile:
+            tile.setSelected(True)
+            view.ensureVisible(tile)
+
+    def rename_control(self, view, c):
+        name, ok = QtWidgets.QInputDialog.getText(self, "Rename control", "Name:", text=c.label)
+        if ok and name.strip():
+            c.label = name.strip()
+            view.template.save()
+            view.build(self.devices.device_for(view.instance))
+
+    def edit_control(self, view, c, drop_shift=False, delete=False):
+        if delete:
+            view.template.remove_control(c)
+        elif drop_shift:
+            c.inputs.pop("shift", None)
+        view.template.save()
+        view.build(self.devices.device_for(view.instance))
+        self.refresh_all()
 
     def _set_act(self, key, b, mode):
         self.bset.set_activation(key, b.map, b.action, mode)
@@ -656,7 +960,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _target_view(self):
         for v in self.views.values():
-            if any(t.isSelected() for t in v.tiles.values()):
+            if any(t.isSelected() for t in v.all_tiles()):
                 return v
         insts = list(self.views)
         if not insts:
@@ -685,6 +989,9 @@ class MainWindow(QtWidgets.QMainWindow):
     # ----- live input -----
     def toggle_press(self, on):
         self.bind_by_press = on
+        if on and self.map_mode:
+            self.a_map.setChecked(False)
+            self.map_mode = False
         self.callout("Pick an action on the left, then press the stick input to bind it" if on else "Bind by pressing off", HOT)
 
     def toggle_mute(self, on):
@@ -704,14 +1011,22 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         order = self.cfg.get("axis_order") or list(range(8))
         dz = self.cfg.get("deadzone", 0.04)
-        for inst, view in self.views.items():
+        now = time.time()
+        for inst, view in list(self.views.items()):
             d = self.devices.device_for(inst)
             if d is None:
                 continue
+            # every button number the device reports, mapped to a control or not
+            for n in range(1, d.num_buttons + 1):
+                on = bool(d.js.get_button(n - 1))
+                pk = (inst, "b", n)
+                if on != self.prev.get(pk, False):
+                    self.prev[pk] = on
+                    tile, key = view.button_changed(n, on)
+                    if on and self.on_press(view, tile, key):
+                        return   # view was rebuilt
             for k, t in view.tiles.items():
-                if t.kind == "button":
-                    on = t.index <= d.num_buttons and bool(d.js.get_button(t.index - 1))
-                elif t.kind == "hat":
+                if t.kind == "hat":
                     on = t.index <= d.num_hats and t.direction in hat_dirs(d.js.get_hat(t.index - 1))
                 else:
                     ai = order[t.index] if t.index < len(order) else t.index
@@ -720,42 +1035,43 @@ class MainWindow(QtWidgets.QMainWindow):
                         t.value = v
                         t.update()
                     on = abs(v) > max(0.5, dz)
-                prev = self.prev.get((inst, k), False)
-                if on != prev:
-                    self.prev[(inst, k)] = on
-                    t.active = on
+                pk = (inst, k)
+                if on != self.prev.get(pk, False):
+                    self.prev[pk] = on
+                    t.set_key_active(t.key, on)
                     if on:
-                        t.flash_t = time.time()
-                        self.on_press(view, t)
+                        self.on_press(view, t, t.key)
+            for t in view.all_tiles():
+                if now - t.flash_t < 0.7:
                     t.update()
-                elif time.time() - t.flash_t < 0.7:
-                    t.update()
+            if view.header is not None and now - view.header.flash_t < 0.9:
+                view.header.update()
 
-    def on_tile_click(self, tile):
-        self.show_binds(tile, speak=False)
+    def on_tile_click(self, tile, key):
+        self.show_binds(tile.view, key, speak=False)
 
-    def on_press(self, view, tile):
-        if self.bind_by_press and tile.kind != "axis":
+    def on_press(self, view, tile, key):
+        """A physical press. Returns True if it rebuilt the view."""
+        if self.map_mode and key[1] == "button":
+            return self.map_button(view, key[2])
+        if self.bind_by_press:
             act = self.palette.current_action()
-            if act:
-                self.assign(tile.key, *act)
-                return
-        if self.bind_by_press and tile.kind == "axis":
-            act = self.palette.current_action()
-            if act and self.catalog.is_axis(*act):
-                self.assign(tile.key, *act)
-                return
-        if tile.kind == "axis":
-            return
-        for t in view.tiles.values():
-            t.setSelected(False)
-        tile.setSelected(True)
-        view.ensureVisible(tile)
-        self.show_binds(tile, speak=True)
+            if act and (key[1] != "axis" or self.catalog.is_axis(*act)):
+                self.assign(key, *act)
+                return False
+        if key[1] == "axis":
+            return False
+        if tile is not None:
+            for t in view.all_tiles():
+                t.setSelected(False)
+            tile.setSelected(True)
+            view.ensureVisible(tile)
+        self.show_binds(view, key, speak=True)
+        return False
 
-    def show_binds(self, tile, speak):
-        binds = self.bset.at(tile.key)
-        label = f"js{tile.view.instance} {input_label(tile.kind, tile.index, tile.direction)}"
+    def show_binds(self, view, key, speak):
+        binds = self.bset.at(key)
+        label = f"js{view.instance} {self.input_name(view, key)}"
         if not binds:
             self.callout(f"{label}: unbound", DIM)
             return

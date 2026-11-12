@@ -22,11 +22,19 @@ It never edits SC's live `actionmaps.xml`; SC overwrites that file anyway.
 
 ## Make it look like your stick
 
-Turn on **Edit layout** and drag tiles to where the buttons sit on your stick. **Set stick photo…** puts your own photo behind them. Each stick's layout saves to `templates\<device name>.json` next to the exe. Share that file and anyone with the same stick gets your layout.
+Your stick tells Windows it has a big block of buttons (VKB sticks report 128), far more than it physically has. The extras are shift layers, hats sending buttons, tempo pulses, or unused. So Stick Citizen only draws the controls you actually have:
+
+1. Turn on **Map controls** and press a control on your stick. Name it (Trigger, Pinky, A2 hat push...).
+2. With that control still selected, press it again with your shift button held. Answer **Shift layer of Trigger** and it gets a second ⇧ row you can bind separately.
+3. Repeat for each control.
+
+Button numbers no control owns go in the collapsed **Other inputs** drawer, and only once they're bound or you've pressed them. Untouched spare numbers never show.
+
+Turn on **Edit layout** to drag controls to where they sit on your stick, and **Set stick photo…** to put your own photo behind them. Each stick saves to `templates\<device name>.json` next to the exe. Share that file and anyone with the same stick gets your map and layout.
 
 ## Shift layers and the mini-stick
 
-Star Citizen can't do joystick shift layers or stick-to-mouse on its own. Set those up in your stick's firmware (VKB: VKBDevCfg). A shifted button just shows up as a higher button number, so bind it like any other.
+Star Citizen can't do joystick shift layers or stick-to-mouse on its own. Set those up in your stick's firmware (VKB: VKBDevCfg). A shifted button reports as a higher button number; map it as the shift layer of its control and bind it there. Dropping an action on the lower (⇧) half of a control binds the shift layer.
 
 ## Files
 
