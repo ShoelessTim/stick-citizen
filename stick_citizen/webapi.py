@@ -178,6 +178,9 @@ class Api:
         self._capture = None          # slot number (or 0 = any) waiting for a press
         self._capture_want = "button"  # "button" (buttons + hats) or "axis"
         self._capture_base = {}        # axis positions when an axis capture was armed
+        self._capture_keys = []        # inputs seen during the press being captured
+        self._capture_down = set()
+        self._capture_t0 = 0.0
         self._captured = None
         self._last_reload_check = 0.0
         self._window = None
@@ -340,16 +343,27 @@ class Api:
             if slot is None:
                 continue
             events.append({"slot": slot, "key": key, "on": on})
+            if self._capture is not None and self._capture_want == "button" and self._capture in (0, slot):
+                if on:
+                    if not self._capture_keys:
+                        self._capture_t0 = time.time()
+                        self._capture = slot                 # stick to the stick that was pressed
+                    if key not in self._capture_keys:
+                        self._capture_keys.append(key)
+                    self._capture_down.add(key)
+                else:
+                    self._capture_down.discard(key)
             if on:
-                if self._capture is not None and self._capture_want == "button" and (self._capture in (0, slot)):
-                    self._captured = {"slot": slot, "key": key}
-                    self._capture = None
                 t = self._tpl(slot)
                 if key not in t.claimed():
                     seen = self._seen.setdefault(slot, set())
                     if key not in seen:
                         seen.add(key)
                         reload = True
+        # a press is done when everything it fired is released (or after 1.5 s held)
+        if self._capture_keys and (not self._capture_down or time.time() - self._capture_t0 > 1.5):
+            self._captured = {"slot": self._capture, "key": self._capture_keys[0], "keys": list(self._capture_keys)}
+            self._capture, self._capture_keys, self._capture_down = None, [], set()
         _d, axes, _g = self._hub.snapshot()
         if self._capture is not None and self._capture_want == "axis" and not self._captured:
             order = self._cfg.get("axis_order") or list(range(8))
@@ -361,7 +375,7 @@ class Api:
                     if i < len(base) and abs(v - base[i]) > 0.5:
                         sc = order.index(i) if i in order else i
                         if sc < 8:
-                            self._captured = {"slot": s["slot"], "key": f"a{sc}"}
+                            self._captured = {"slot": s["slot"], "key": f"a{sc}", "keys": [f"a{sc}"]}
                             self._capture = None
                         break
                 if self._captured:
@@ -442,12 +456,41 @@ class Api:
         self._capture = int(slot)
         self._capture_want = "axis" if want == "axis" else "button"
         self._capture_base = {uid: list(v) for uid, v in self._hub.snapshot()[1].items()}
+        self._capture_keys, self._capture_down = [], set()
         self._captured = None
         return {"ok": True}
 
     def cancel_capture(self):
-        self._capture = None
+        self._capture, self._capture_keys, self._capture_down = None, [], set()
         return {"ok": True}
+
+    def learn(self, slot, cid, keys):
+        """Setup step: the control was pressed and these inputs fired. One input: that's the control.
+        Several (a two-stage or rapid-fire trigger): they become its stages, in the order they fired."""
+        t = self._tpl(slot)
+        c = t.control(cid)
+        if not c or not keys:
+            return {"ok": False, "msg": "Nothing to learn"}
+        keys = list(dict.fromkeys(keys))
+        if c.dir or c.kind == "axis" or len(keys) == 1:          # hat directions and axes take one input
+            t.set_layer(c, "base", keys[0])
+            t.save()
+            return self._ok(f"{self.input_name(slot, keys[0])} = {short_label(keys[0])}")
+        group = c.group or c.label
+        siblings = [x for x in t.controls if x.group == group and not x.dir] if c.group else []
+        if not c.group:
+            c.group, c.label = group, "stage 1"
+            siblings = [c]
+        siblings.sort(key=lambda x: x.label)
+        for i, k in enumerate(keys):
+            target = siblings[i] if i < len(siblings) else None
+            if target is None:
+                target = t.add_control(f"stage {i + 1}", k, group, "", c.dot)
+                target.how = c.how
+            else:
+                t.set_layer(target, "base", k)
+        t.save()
+        return self._ok(f"{group}: {len(keys)} stages = " + ", ".join(short_label(k) for k in keys))
 
     def map_control(self, slot, key, label, group="", direction="", target_id=""):
         t = self._tpl(slot)

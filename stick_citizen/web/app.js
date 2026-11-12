@@ -506,7 +506,7 @@ async function pressFlow(slot, m, layer) {
     layer === "shift" ? "Hold your shift button and press this control." : (m.how || "Press this control on your stick."), m.kind === "axis" ? "axis" : "button");
   if (!got) return;
   closeModal();
-  await apply(await API.assign_input(got.slot, m.id, layer, got.key));
+  await apply(layer === "base" ? await API.learn(got.slot, m.id, got.keys || [got.key]) : await API.assign_input(got.slot, m.id, layer, got.key));
   renderDrawer();
 }
 
@@ -527,7 +527,7 @@ async function setupFlow(stick) {
     const got = await coach(`${i + 1} of ${todo.length}`, what, how, m.kind === "axis" ? "axis" : "button");
     if (got === "stop") break;
     if (got === "skip") continue;
-    const res = await API.assign_input(got.slot, m.id, "base", got.key);
+    const res = await API.learn(got.slot, m.id, got.keys || [got.key]);
     if (res.state) S.state = res.state;
     done++;
   }

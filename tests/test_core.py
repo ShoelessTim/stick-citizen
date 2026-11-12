@@ -133,7 +133,8 @@ def test_api_map_bind_save(tmp_path, monkeypatch):
     slot = next(s["slot"] for s in api.get_state()["sticks"] if s["side"] == "R")
     api.arm_capture(slot)
     hub.press("u2", "b1")
-    assert api.poll()["captured"] == {"slot": slot, "key": "b1"}
+    hub.press("u2", "b1", False)
+    assert api.poll()["captured"] == {"slot": slot, "key": "b1", "keys": ["b1"]}
     res = api.map_control(slot, "b1", "My trigger")
     cid = res["control"]
     api.map_control(slot, "b33", "", "", "", cid)                # shift layer
@@ -189,7 +190,28 @@ def test_axis_capture_for_t1_wheel(tmp_path, monkeypatch):
     hub.press("u2", "b5")                                   # a button press doesn't count for an axis
     assert "captured" not in api.poll()
     hub.axes = {"u2": [0, 0, 0, 0, 0, 0, 0.4]}
-    assert api.poll()["captured"] == {"slot": r["slot"], "key": "a6"}
+    assert api.poll()["captured"]["key"] == "a6"
+
+
+def test_setup_learns_multi_button_controls(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    r = next(s for s in api.get_state()["sticks"] if s["side"] == "R")
+    api.arm_capture(r["slot"])
+    hub.press("u2", "b4")
+    hub.press("u2", "b5")                                   # rapid trigger fires two buttons
+    assert "captured" not in api.poll()                    # still held: keep listening
+    hub.press("u2", "b4", False)
+    hub.press("u2", "b5", False)
+    got = api.poll()["captured"]
+    assert got["keys"] == ["b4", "b5"]
+    res = api.learn(r["slot"], "rapid-trigger", got["keys"])
+    st = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])
+    stages = [c for c in st["controls"] if c["group"] == "Rapid trigger"]
+    assert [c["inputs"]["base"] for c in stages] == ["b4", "b5"] and [c["label"] for c in stages] == ["stage 1", "stage 2"]
+    # a hat direction only ever takes the first input (diagonals fire two)
+    api.learn(r["slot"], "hat-a4-up", ["h1u", "h1r"])
+    st = next(s for s in api.get_state()["sticks"] if s["slot"] == r["slot"])
+    assert next(c for c in st["controls"] if c["id"] == "hat-a4-up")["inputs"] == {"base": "h1u"}
 
 
 def test_mode_of():

@@ -24,7 +24,7 @@ It never edits SC's live `actionmaps.xml`; SC overwrites that file anyway.
 
 The VKB Gladiator NXT EVO (left and right, SCG grip) is built in: photo, every control labeled with VKB's names, placed on the stick. Plug in and they show up.
 
-The first time, click **Set up left stick** (and right): each control lights up in turn and you press it, so Stick Citizen learns your stick's button numbers. Takes about two minutes per stick; **Skip** anything your grip doesn't have. The trigger's two stages are already known.
+The first time, click **Set up left stick** (and right): each control lights up in turn and you press it, so Stick Citizen learns your stick's button numbers. Takes about two minutes per stick; **Skip** anything your grip doesn't have. The trigger's two stages are already known, and anything that sends more than one button (like the rapid trigger) is learned as stages automatically.
 
 Then click any label to bind actions. Each control has a **base** row and a **⇧ shift** row (press the control with your shift button held to add it).
 

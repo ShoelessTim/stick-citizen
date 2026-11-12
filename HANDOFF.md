@@ -1,6 +1,6 @@
 # Stick Citizen — Handoff
 
-**State (2026-11-12): v3.2.0 shipped (versioned exe names; T1 is an axis, EN1 an encoder; left A2 is the 8-way/mouse mini-stick). v3.1.0 added built-in profiles. The cockpit screen works end to end in the preview harness; it has had one real run on Tim's PC (v3.0.0), which exposed that a fresh install started blank. v3.1.0 fixes that with built-in VKB profiles and a guided setup. Next: Tim runs setup on both sticks, then we bake his learned button numbers into the built-in profiles so nobody else has to.**
+**State (2026-11-12): v3.3.0 shipped (setup learns every input a press fires, so multi-button controls like the rapid trigger become stages automatically). v3.2.0 (versioned exe names; T1 is an axis, EN1 an encoder; left A2 is the 8-way/mouse mini-stick). v3.1.0 added built-in profiles. The cockpit screen works end to end in the preview harness; it has had one real run on Tim's PC (v3.0.0), which exposed that a fresh install started blank. v3.1.0 fixes that with built-in VKB profiles and a guided setup. Next: Tim runs setup on both sticks, then we bake his learned button numbers into the built-in profiles so nobody else has to.**
 
 Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. This file is the engineering state.
 
@@ -17,6 +17,10 @@ Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. T
 | User data | `paths.py` | `%APPDATA%\StickCitizen` (templates, images, settings); v2 files copied once |
 | Ring course | `app.py`, `sim.py` | pygame; launched by the Fly tab as `--fly <layout.xml>` |
 | Visual QA | `tools/preview.py` | Real Api + fake sticks → browser copy with a mock API → Playwright screenshots. **Run it and look before every UI release.** |
+
+## Principle
+
+Don't encode hardware facts from chat. The stick is the source of truth: setup records every input each press fires, and Tim's learned map gets baked into the built-in profile. Names and dot positions are the only hand-made parts.
 
 ## Next steps (in order)
 
