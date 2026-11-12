@@ -71,10 +71,14 @@ function summary(stick, g) {
   return { main, extra, shift, unset };
 }
 
-/* controls in the order the setup walkthrough asks for them: top of the stick down */
+/* controls in the order the setup walkthrough asks for them: top of the stick down;
+   inside a hat: the four main directions, the push, then the diagonals */
+const SETUP_DIRS = ["up", "right", "down", "left", "push", "up-right", "down-right", "down-left", "up-left", ""];
+const DIAGONAL = (d) => /-/.test(d || "");
 function setupOrder(stick) {
   const gs = groupsOf(stick).sort((a, b) => (a.dot[1] - b.dot[1]) || (a.dot[0] - b.dot[0]));
-  return gs.flatMap((g) => g.members.filter((m) => !m.inputs.base).map((m) => ({ g, m })));
+  return gs.flatMap((g) => [...g.members].sort((a, b) => SETUP_DIRS.indexOf(a.dir) - SETUP_DIRS.indexOf(b.dir))
+    .filter((m) => !m.inputs.base).map((m) => ({ g, m })));
 }
 
 /* ---------------- boot ---------------- */
@@ -129,7 +133,7 @@ function render() {
   const need = shown().filter((x) => x.unassigned && x.unassigned.length);
   const sb = $("#btnSetup");
   if (sb) {
-    sb.hidden = !need.length || !!S.coach;
+    sb.hidden = !need.length || !!S.wiz;
     if (need.length) sb.textContent = `Set up ${need[0].side === "L" ? "left" : need[0].side === "R" ? "right" : "this"} stick · ${need[0].unassigned.length} to learn`;
   }
   renderStage();
@@ -285,7 +289,7 @@ function drawCard(stage, svg, stick, p, x, y, w, ch, side, compact) {
   const card = h("button", { class: cls, style: `left:${x}px;top:${y}px;width:${w}px;height:${ch}px`,
     onclick: () => openDrawer(stick.slot, g.id) },
     h("div", { class: "hd" }, h("span", { class: "n" }, String(p.num)), h("span", { class: "name" }, g.name.toUpperCase()), h("span", { class: "code" }, codes)),
-    h("div", { class: "a" + (a ? "" : " none") }, a || (target ? `Press it now${g.hat ? " · " + (DIR_ARROW[stick.controls.find((c) => c.id === S.coach.cid).dir] || "") : ""}` : unset ? "Not set up · press to learn" : isShiftCtl ? "Hold for ⇧ layer" : "—"),
+    h("div", { class: "a" + (a ? "" : " none") }, a || (target ? `Press it now${g.hat ? " · " + (DIR_ARROW[(stick.controls.find((c) => c.id === S.coach.cid) || {}).dir] || "") : ""}` : unset ? "Not set up · press to learn" : isShiftCtl ? "Hold for ⇧ layer" : "—"),
       aTag ? h("span", { class: "tag" }, aTag) : null, more > 0 ? h("span", { class: "tag" }, "+" + more) : null),
     (!compact || (ch >= 48 && (shift || isShiftCtl))) ? h("div", { class: "s" + (shift ? "" : " none") },
       shift ? ["⇧ " + shift.b.label, tagFor(shift.b.activation) ? h("span", { class: "tag" }, tagFor(shift.b.activation)) : null]
@@ -510,45 +514,212 @@ async function pressFlow(slot, m, layer) {
   renderDrawer();
 }
 
-/* guided setup: highlight each control in turn and learn its input from a press */
+/* ---------------- guided setup wizard ----------------
+   One control at a time: the photo zooms in on it, a compass shows which way to push,
+   and the raw readout shows what the stick is sending. */
+const sideName = (stick) => (stick.side === "L" ? "left" : stick.side === "R" ? "right" : "this");
+const memberOf = (stick, id) => stick.controls.find((c) => c.id === id);
+const isMini = (g) => /mini-?stick/i.test(g.name);
+
 async function setupFlow(stick) {
-  const todo = setupOrder(stick);
+  const slot = stick.slot;
+  const todo = setupOrder(stick).map(({ g, m }) => ({ gid: g.id, id: m.id }));
   if (!todo.length) return;
-  S.view = "edit";
-  document.querySelectorAll("#views button").forEach((b) => b.classList.toggle("on", b.dataset.view === "edit"));
-  if (S.stick === "both" || S.stick !== stick.slot) S.stick = stick.slot;
-  let done = 0;
-  for (let i = 0; i < todo.length; i++) {
-    const { g, m } = todo[i];
-    S.coach = { slot: stick.slot, cid: m.id };
-    render();
-    const what = m.group ? `${g.name} — ${DIR_ARROW[m.dir] || ""} ${m.dir || m.label}` : g.name;
-    const how = m.how || (g.hat && m.dir === "push" ? "Push the hat straight in." : g.hat && m.dir ? `Push the hat ${m.dir}.` : "Press it once.");
-    const got = await coach(`${i + 1} of ${todo.length}`, what, how, m.kind === "axis" ? "axis" : "button");
-    if (got === "stop") break;
-    if (got === "skip") continue;
-    const res = await API.learn(got.slot, m.id, got.keys || [got.key]);
-    if (res.state) S.state = res.state;
-    done++;
-  }
-  S.coach = null;
-  $("#coach").hidden = true;
+  S.stick = slot;
+  S.wiz = { slot, todo, i: 0, learned: 0, gone: new Set(), note: null, last: null };
+  const onMouse = (e) => { if (S.wiz && Math.abs(e.movementX) + Math.abs(e.movementY) > 0) { S.wiz.mouseAt = Date.now(); wizLive(); } };
+  window.addEventListener("mousemove", onMouse);
   render();
-  toast(done ? `Learned ${done} control${done === 1 ? "" : "s"}. Drag any dot that's off onto its button.` : "Setup stopped");
+  const W = S.wiz;
+  while (W.i < W.todo.length) {
+    const step = W.todo[W.i];
+    const st = stickBySlot(slot);
+    const m = st && memberOf(st, step.id);
+    if (!m || W.gone.has(step.id)) { W.i++; continue; }
+    const g = groupsOf(st).find((x) => x.id === step.gid);
+    const got = await wizStep(st, g, m);
+    if (got === "stop") break;
+    if (got === "back") { let k = W.i - 1; while (k >= 0 && W.gone.has(W.todo[k].id)) k--; W.i = Math.max(0, k); W.note = null; continue; }
+    if (got === "skip") { W.i++; W.note = null; continue; }
+    if (got === "absent") {                       // not on this stick: take the whole control off the map
+      for (const x of g.members) { W.gone.add(x.id); await API.edit_control(slot, x.id, null, null, null, false, true); }
+      S.state = await API.get_state(); W.note = null; continue;
+    }
+    // --- a press came in ---
+    const keys = got.keys || [got.key];
+    let key = keys[0];
+    if (g.hat && m.dir) {
+      const mine = new Set(g.members.filter((x) => x.id !== m.id).map((x) => x.inputs.base).filter(Boolean));
+      if (DIAGONAL(m.dir)) {
+        const fresh = keys.find((k) => !mine.has(k));
+        if (!fresh) {                              // a diagonal that is just two directions at once
+          for (const x of g.members.filter((x) => DIAGONAL(x.dir))) { W.gone.add(x.id); await API.edit_control(slot, x.id, null, null, null, false, true); }
+          S.state = await API.get_state();
+          W.note = { kind: "ok", text: `${g.name} sends diagonals as two directions at once, so there is nothing more to learn for it.` };
+          continue;
+        }
+        key = fresh;
+      }
+    }
+    const owner = st.controls.find((c) => c.id !== m.id && Object.values(c.inputs).includes(key));
+    if (owner && !(owner.group && owner.group === m.group && !m.dir)) {
+      const oname = owner.group ? `${owner.group} ${DIR_ARROW[owner.dir] || ""} ${owner.label}` : owner.label;
+      const same = owner.group === m.group;
+      const pick = await wizAsk(st, g, m, `That sent ${shortKey(key)}, which is already ${oname}.`,
+        same ? "Looks like the same direction twice. Push it the way the compass shows." : `You may have pressed ${owner.group || owner.label} instead. The picture shows the one to press.`);
+      if (pick !== "use") { W.note = null; continue; }
+    }
+    const res = await API.learn(slot, m.id, g.hat && m.dir ? [key] : keys);
+    if (res.state) S.state = res.state;
+    W.learned++;
+    W.last = { id: m.id, keys: g.hat && m.dir ? [key] : keys };
+    W.note = null;
+    W.i++;
+  }
+  window.removeEventListener("mousemove", onMouse);
+  API.cancel_capture(); S.capture = null;
+  await wizDone(slot);
 }
 
-function coach(step, what, how, want = "button") {
+function wizShell(st, g, m, right) {
+  const W = S.wiz;
+  const box = $("#wizard");
+  box.innerHTML = "";
+  box.hidden = false;
+  const src = imgFor(st);
+  const asp = S.aspect[src] || 0.78;
+  const P = Math.min(560, Math.max(320, Math.min(window.innerHeight - 190, window.innerWidth * 0.42)));
+  const span = 0.36;                               // share of the photo's width that fits in the zoom
+  const iw = P / span, ih = iw / asp;
+  let left = P / 2 - g.dot[0] * iw, top = P / 2 - g.dot[1] * ih;
+  left = Math.min(0, Math.max(P - iw, left)); top = Math.min(0, Math.max(P - ih, top));
+  const zoom = h("div", { class: "wz-zoom", style: `width:${P}px;height:${P}px` },
+    h("img", { src, alt: "", style: `left:${left}px;top:${top}px;width:${iw}px;height:${ih}px` }));
+  for (const o of groupsOf(st)) {
+    const x = left + o.dot[0] * iw, y = top + o.dot[1] * ih;
+    if (x < 8 || y < 8 || x > P - 8 || y > P - 8) continue;
+    if (o.id === g.id) zoom.append(h("div", { class: "wz-ring", style: `left:${x}px;top:${y}px` }),
+      h("div", { class: "wz-tag", style: `left:${x}px;top:${y}px` }, "THIS ONE"));
+    else zoom.append(h("div", { class: "wz-other", style: `left:${x}px;top:${y}px`, title: o.name }, h("i"), h("span", {}, o.name)));
+  }
+  const tw = 86, th = tw / asp;
+  zoom.append(h("div", { class: "wz-mini", style: `width:${tw}px;height:${th}px` },
+    h("img", { src, alt: "" }), h("b", { style: `left:${g.dot[0] * tw}px;top:${g.dot[1] * th}px` })));
+  const n = W.todo.filter((t) => !W.gone.has(t.id)).length;
+  const at = W.todo.slice(0, W.i).filter((t) => !W.gone.has(t.id)).length + 1;
+  const head = h("div", { class: "wz-head" },
+    h("span", { class: "wz-step" }, `${sideName(st).toUpperCase()} STICK · ${Math.min(at, n)} OF ${n}`),
+    h("div", { class: "wz-bar" }, h("i", { style: `width:${Math.round((100 * (at - 1)) / Math.max(1, n))}%` })));
+  box.append(h("div", { class: "wz-box" }, zoom, h("div", { class: "wz-side" }, head, right)));
+}
+
+function compass(st, g, m) {
+  const W = S.wiz;
+  const cells = ["up-left", "up", "up-right", "left", "push", "right", "down-left", "down", "down-right"];
+  return h("div", { class: "wz-compass" }, cells.map((d) => {
+    const c = g.members.find((x) => x.dir === d);
+    if (!c) return h("div", { class: "wz-cell none" });
+    const key = c.inputs.base;
+    return h("div", { class: ["wz-cell", c.id === m.id && "now", key && "done"].filter(Boolean).join(" "), "data-key": key || "" },
+      h("b", {}, DIR_ARROW[d] || "●"), h("span", {}, key ? shortKey(key) : c.id === m.id ? "PUSH" : ""));
+  }));
+}
+
+function wizStep(st, g, m) {
   return new Promise((resolve) => {
-    API.arm_capture(S.coach.slot, want);
-    S.capture = (got) => resolve(got);
-    const c = $("#coach");
-    c.innerHTML = "";
+    const W = S.wiz;
+    S.coach = { slot: st.slot, cid: m.id };
+    API.arm_capture(st.slot, m.kind === "axis" ? "axis" : "button");
     const finish = (v) => { API.cancel_capture(); S.capture = null; resolve(v); };
-    c.append(h("span", { class: "step" }, step), h("div", { class: "what" }, h("b", {}, what), h("span", {}, how)),
-      h("button", { class: "btn", onclick: () => finish("skip") }, "Skip — not on my stick"),
-      h("button", { class: "btn", onclick: () => finish("stop") }, "Stop"));
-    c.hidden = false;
+    S.capture = (got) => resolve(got);
+    const dirWord = m.dir === "push" ? "straight in" : m.dir;
+    const title = g.hat && m.dir ? `Push it ${dirWord}` : m.kind === "axis" ? "Move it end to end" : g.hat ? `${m.label}` : "Press it once";
+    const how = m.how || (g.hat && m.dir === "push" ? "Press the hat straight down into the stick, without tilting it."
+      : g.hat && m.dir ? `Tilt the hat ${m.dir} and let go.` : "Press it and let go.");
+    const right = [
+      h("h2", { class: "wz-name" }, g.name),
+      h("div", { class: "wz-do" }, title),
+      h("p", { class: "wz-how" }, how),
+      g.hat && g.members.some((x) => x.dir) ? compass(st, g, m) : null,
+      isMini(g) ? h("div", { class: "wz-warn", id: "wzMouse", hidden: true },
+        h("b", {}, "Your pointer just moved."), " If that was the mini-stick, it is in mouse mode. Press it straight in to switch to hat mode, then push it again.") : null,
+      W.note ? h("div", { class: "wz-note " + W.note.kind }, W.note.text) : null,
+      h("div", { class: "wz-raw" }, h("span", {}, "STICK IS SENDING"), h("div", { id: "wzRaw" }, h("em", {}, "nothing yet"))),
+      h("div", { class: "wz-btns" },
+        h("button", { class: "btn", disabled: W.i === 0 ? true : null, onclick: () => finish("back") }, "Back"),
+        h("button", { class: "btn", onclick: () => finish("skip") }, "Skip for now"),
+        h("button", { class: "btn", onclick: () => finish("absent") }, g.hat ? "My stick doesn't have this" : "Not on my stick"),
+        h("button", { class: "btn", onclick: () => finish("stop") }, "Stop")),
+    ];
+    wizShell(st, g, m, right);
+    wizLive();
   });
+}
+
+function wizAsk(st, g, m, title, text) {
+  return new Promise((resolve) => {
+    S.coach = { slot: st.slot, cid: m.id };
+    wizShell(st, g, m, [
+      h("h2", { class: "wz-name" }, g.name),
+      h("div", { class: "wz-do warn" }, title),
+      h("p", { class: "wz-how" }, text),
+      g.hat && g.members.some((x) => x.dir) ? compass(st, g, m) : null,
+      h("div", { class: "wz-btns" },
+        h("button", { class: "btn go", onclick: () => resolve("again") }, "Try again"),
+        h("button", { class: "btn", onclick: () => resolve("use") }, "No, that was right")),
+    ]);
+  });
+}
+
+/* live parts of the wizard: what the stick is sending right now, and the mouse-mode hint */
+function wizLive() {
+  const W = S.wiz;
+  if (!W || $("#wizard").hidden) return;
+  const raw = $("#wzRaw");
+  const keys = [...(S.live[W.slot] || [])];
+  if (raw) {
+    if (keys.length) { raw.innerHTML = ""; keys.forEach((k) => raw.append(h("b", {}, shortKey(k)))); W.sent = keys; }
+    else if (W.sent) { raw.innerHTML = ""; W.sent.forEach((k) => raw.append(h("b", { class: "old" }, shortKey(k)))); raw.append(h("em", {}, "last press")); }
+  }
+  document.querySelectorAll("#wizard .wz-cell").forEach((c) => c.classList.toggle("hot", !!c.dataset.key && keys.includes(c.dataset.key)));
+  const warn = $("#wzMouse");
+  if (warn) warn.hidden = !(W.mouseAt && Date.now() - W.mouseAt < 2500 && !keys.length);
+}
+
+async function wizDone(slot) {
+  const W = S.wiz;
+  S.coach = null;
+  S.state = await API.get_state();
+  const st = stickBySlot(slot);
+  const left = st ? st.unassigned.length : 0;
+  const other = sticks().find((x) => x.slot !== slot && x.unassigned.length);
+  const close = () => { $("#wizard").hidden = true; S.wiz = null; render(); };
+  const box = $("#wizard");
+  box.innerHTML = "";
+  box.hidden = false;
+  box.append(h("div", { class: "wz-box done" }, h("div", { class: "wz-side" },
+    h("h2", { class: "wz-name" }, left ? `${sideName(st)} stick: ${W.learned} learned, ${left} left` : `${sideName(st)} stick is set up`),
+    h("p", { class: "wz-how" }, left ? "Run Set up again any time to finish the rest." : "Every control on the picture now knows its button. You won't need to do this again."),
+    h("div", { class: "wz-btns" },
+      other ? h("button", { class: "btn go", onclick: () => { close(); setupFlow(other); } }, `Set up the ${sideName(other)} stick`) : null,
+      !other && S.afterSetup ? h("button", { class: "btn go", onclick: async () => { const id = S.afterSetup; S.afterSetup = null; close(); apply(await API.apply_layout(id)); } }, "Apply the layout you picked") : null,
+      !other && !S.afterSetup ? h("button", { class: "btn go", onclick: () => { close(); layoutsFlow(); } }, "Pick a starting layout") : null,
+      h("button", { class: "btn", onclick: copyMaps }, "Copy my stick maps"),
+      h("button", { class: "btn", onclick: close }, "Done")))));
+}
+
+/* the learned button numbers as text, to paste into a bug report or send to the developers */
+async function copyMaps() {
+  const out = {};
+  for (const s of sticks()) out[s.name] = Object.fromEntries(s.controls.filter((c) => Object.keys(c.inputs).length).map((c) => [c.id, c.inputs]));
+  const text = "Stick Citizen " + S.state.version + " stick maps\n" + JSON.stringify(out, null, 1);
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+    const ta = h("textarea", { style: "position:fixed;left:-999px" }); ta.value = text; document.body.append(ta); ta.select();
+    try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    ta.remove();
+  }
+  toast(ok ? "Stick maps copied. Paste them anywhere." : "Couldn't copy. The maps are in %APPDATA%\\StickCitizen\\templates");
 }
 
 async function addDirFlow(slot, g) {
@@ -623,13 +794,14 @@ async function pollLoop() {
       let dirty = false;
       for (const ev of r.events) {
         const set = S.live[ev.slot] || (S.live[ev.slot] = new Set());
-        if (ev.on) { set.add(ev.key); onPress(ev.slot, ev.key); } else set.delete(ev.key);
+        if (ev.on) { set.add(ev.key); onPress(ev.slot, ev.key); if (S.wiz && ev.slot === S.wiz.slot) S.wiz.sent = [...set]; } else set.delete(ev.key);
         dirty = true;
       }
       S.axes = r.axes || {};
       if (r.reload) { await refresh(); dirty = true; }
       if (dirty) { renderStage(); if (S.othersOpen) renderOthers(); }
       renderMeters();
+      if (S.wiz) wizLive();
     } catch (err) { /* backend busy; try again */ }
     await new Promise((res) => setTimeout(res, 16));
   }
@@ -680,7 +852,15 @@ function toast(msg) {
 
 async function layoutsFlow() {
   const list = await API.list_layouts();
-  const pick = async (l) => {
+  const pick = async (l, force) => {
+    const need = sticks().filter((x) => x.unassigned.length > 3);
+    if (l.id !== "blank" && need.length && !force) {
+      modal([h("h2", {}, "Set up your sticks first"),
+        h("p", {}, `${l.name} puts actions on real buttons, and Stick Citizen doesn't know yours yet (${need.map((x) => `${sideName(x)}: ${x.unassigned.length} to learn`).join(", ")}). Set up takes a couple of minutes per stick.`),
+        h("div", { class: "row" }, h("button", { class: "btn", onclick: () => pick(l, true) }, "Apply anyway"),
+          h("button", { class: "btn go", onclick: () => { closeModal(); S.afterSetup = l.id; setupFlow(need[0]); } }, "Set up now"))]);
+      return;
+    }
     closeModal();
     apply(await API.apply_layout(l.id));
   };
@@ -713,7 +893,10 @@ function wire() {
   const setupBtn = h("button", { class: "chip setup", id: "btnSetup", onclick: () => {
     const s = shown().find((x) => x.unassigned.length) ; if (s) setupFlow(s); } }, "");
   $(".bar").insertBefore(setupBtn, $("#hint"));
-  const obs = new MutationObserver(() => { mapBtn.hidden = S.view !== "edit"; });
+  const copyBtn = h("button", { class: "chip", id: "btnCopyMaps", onclick: copyMaps }, "Copy stick maps");
+  $(".bar").insertBefore(copyBtn, $("#hint"));
+  copyBtn.hidden = true;
+  const obs = new MutationObserver(() => { mapBtn.hidden = copyBtn.hidden = S.view !== "edit"; });
   obs.observe($("#app"), { attributes: true, attributeFilter: ["class"] });
   mapBtn.hidden = true;
 }

@@ -86,7 +86,7 @@ window.MOCK_API = (() => {
     search: (q) => Promise.resolve(F.search.filter(a => !q || (a.label + a.group).toLowerCase().includes(q.toLowerCase())).slice(0, 80)),
     assign: () => ok("Bound"), remove: () => ok(), set_activation: () => ok(), undo: () => ok("Undone"),
     arm_capture: () => Promise.resolve({ ok: true }), cancel_capture: () => Promise.resolve({ ok: true }),
-    map_control: () => ok("Mapped"), assign_input: () => ok("Learned"), set_dot: () => Promise.resolve({ ok: true }),
+    map_control: () => ok("Mapped"), assign_input: () => ok("Learned"), learn: () => ok("Learned"), set_dot: () => Promise.resolve({ ok: true }),
     edit_control: () => ok(), choose_photo: () => Promise.resolve({ ok: false }), open_layout: () => Promise.resolve({ ok: false }),
     save_layout: () => ok("Saved"), fly_test: () => ok("Ring course launched"), say: () => Promise.resolve({}),
     set_speech: () => Promise.resolve({ ok: true }),
@@ -131,7 +131,15 @@ def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
         r = "S.state.sticks.find(s => s.side === 'R').slot"
         if fresh:
             snap("0-fresh-both", "S.stick='both'; render();")
-            snap("0-fresh-setup", "setTimeout(() => setupFlow(S.state.sticks.find(s => s.side === 'R')), 0)", 900)
+            l = "S.state.sticks.find(s => s.side === 'L')"
+            snap("0-fresh-layout-needs-setup", "layoutsFlow().then(() => document.querySelectorAll('.lay')[1].click())", 700)
+            snap("0-wizard-hat-up", "closeModal(); setTimeout(() => setupFlow(%s), 0)" % l, 900)
+            # learn up/right/down/left, leaving the mini-stick push step; then fake a mouse move
+            for k in ("b20", "b21", "b22", "b23"):
+                pg.evaluate("(() => { const m = %s.controls.find(c => c.id === S.wiz.todo[S.wiz.i].id); m.inputs.base = '%s'; const f = S.capture; S.capture = null; f({slot: S.wiz.slot, key: '%s', keys: ['%s']}); })()" % (l, k, k, k))
+                pg.wait_for_timeout(150)
+            snap("0-wizard-mini-stick", "window.dispatchEvent(new MouseEvent('mousemove', {movementX: 9, movementY: 3})); window.__events.push({slot: S.wiz.slot, key: 'b21', on: true}, {slot: S.wiz.slot, key: 'b21', on: false})", 500)
+            snap("0-wizard-duplicate", "(() => { const f = S.capture; S.capture = null; f({slot: S.wiz.slot, key: 'b20', keys: ['b20']}); })()", 500)
         else:
             snap("1-both", "S.stick='both'; S.othersOpen=true; render(); window.__events.push({slot:%s,key:'b1',on:true})" % r)
             snap("2-right", "S.stick=%s; render();" % r)

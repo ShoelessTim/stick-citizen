@@ -1,6 +1,6 @@
 # Stick Citizen — Handoff
 
-**State (2026-11-12): v3.4.0 shipped ("Start from a layout" picker with Sublight, our own layout inspired by Subliminal's; plain-English names for common actions). v3.3.0 (setup learns every input a press fires, so multi-button controls like the rapid trigger become stages automatically). v3.2.0 (versioned exe names; T1 is an axis, EN1 an encoder; left A2 is the 8-way/mouse mini-stick). v3.1.0 added built-in profiles. The cockpit screen works end to end in the preview harness; it has had one real run on Tim's PC (v3.0.0), which exposed that a fresh install started blank. v3.1.0 fixes that with built-in VKB profiles and a guided setup. Next: Tim runs setup on both sticks, then we bake his learned button numbers into the built-in profiles so nobody else has to.**
+**State (2026-11-12): v3.5.0 shipped: Set up is now a one-control-at-a-time wizard (photo zooms to the control, compass shows the direction, raw "stick is sending" readout, mouse-mode hint on the mini-stick, duplicate-press check, Back / Skip / "not on my stick", diagonals that are just two directions get dropped automatically). Picking a layout before setup now offers Set up first. "Copy my stick maps" (wizard end screen and Edit bar) puts the learned numbers on the clipboard. Tim's v3.4.0 run: setup never finished because the hats were hard to tell apart on the map, so Sublight had nothing to land on. Tim confirmed both sticks are on VKB's stock profile, so his run becomes the baked default.**
 
 Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. This file is the engineering state.
 
@@ -22,13 +22,13 @@ Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. T
 
 ## Start here (next session)
 
-1. Ask Tim how the v3.4.0 run went: Set up on both sticks, then Sublight applied. Get screenshots.
-2. Pull his learned maps from `%APPDATA%\StickCitizen\templates\` and bake the button numbers into `data/starters/*.json`.
-3. Fix dots/names he reports, then build "Tim's layout" with him and ship it in `data/layouts/`.
+1. Tim runs Set up on both sticks in v3.5.0, then pastes "Copy my stick maps" into chat (Claude's folder request for %APPDATA% was blocked, so the clipboard is the route).
+2. Bake those button numbers into `data/starters/*.json` (keep labels and dots); then setup is only for people who changed their VKB config.
+3. Fix dots/names he reports from the wizard zoom, then build "Tim's layout" with him and ship it in `data/layouts/`.
 
 **Parked, Tim's call:** more "inspired by" layouts (BuzZz Killer etc.). Sublight was built from the Subliminal chart Tim shared; we have no BuzZz chart, so one would be guesswork. Tim plans to ask both creators for permission once the app works; don't add more look-alikes before that.
 
-**Not yet verified on real hardware:** everything since v3.0.0 (built-in profiles, setup walkthrough, multi-input learn, axis capture for T1, layouts picker). Only checked with fake sticks via `tools/preview.py` and tests.
+**Not yet verified on real hardware:** everything since v3.0.0 (built-in profiles, setup wizard, multi-input learn, axis capture for T1, layouts picker, mouse-mode hint, clipboard copy in WebView2). Unknown until Tim's run: whether the mini-stick's hat mode sends 8 separate buttons, 4 buttons with diagonals as pairs, or a POV hat. The wizard handles all three. Only checked with fake sticks via `tools/preview.py` and tests.
 
 ## Principle
 

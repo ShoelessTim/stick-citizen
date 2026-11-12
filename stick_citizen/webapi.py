@@ -626,8 +626,10 @@ class Api:
             t = self._tpl(s["slot"])
             for cid, layers in d.get("sides", {}).get(side, {}).items():
                 c = t.control(cid)
+                if c is None:            # a control this stick doesn't have (removed in setup): nothing to wait for
+                    continue
                 for layer, v in layers.items():
-                    key = c.inputs.get(layer) if c else None
+                    key = c.inputs.get(layer)
                     if key and self._catalog.get(v[0], v[1]):
                         self._bset.binds.setdefault(bind_key(s["slot"], key), []).append(
                             Bound(v[0], v[1], v[2] if len(v) > 2 else self._catalog.default_activation(v[0], v[1])))
