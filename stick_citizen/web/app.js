@@ -465,9 +465,9 @@ function modal(content) {
 }
 function closeModal() { $("#modal").hidden = true; API.cancel_capture(); S.capture = null; }
 
-function waitForPress(slot, title, text, want = "button") {
+function waitForPress(slot, title, text, want = "button", cid = "") {
   return new Promise((resolve) => {
-    API.arm_capture(slot || 0, want);
+    API.arm_capture(slot || 0, want, cid);
     S.capture = resolve;
     modal([h("h2", {}, title), h("p", {}, text), h("div", { class: "wait" }, h("i"), "Waiting for a press…"),
       h("div", { class: "row" }, h("button", { class: "btn", onclick: () => { closeModal(); resolve(null); } }, "Cancel"))]);
@@ -508,7 +508,7 @@ async function mapFlow(slot, key) {
 async function pressFlow(slot, m, layer) {
   const name = m.group ? `${m.group} ${DIR_ARROW[m.dir] || ""} ${m.label}` : m.label;
   const got = await waitForPress(slot, layer === "shift" ? `Shift layer for ${name}` : name,
-    layer === "shift" ? "Hold your shift button and press this control." : (m.how || "Press this control on your stick."), m.kind === "axis" ? "axis" : "button");
+    layer === "shift" ? "Hold your shift button and press this control." : (m.how || "Press this control on your stick."), m.kind === "axis" ? "axis" : "button", m.id);
   if (!got) return;
   closeModal();
   await apply(layer === "base" ? await API.learn(got.slot, m.id, got.keys || [got.key]) : await API.assign_input(got.slot, m.id, layer, got.key));
@@ -634,7 +634,7 @@ function wizStep(st, g, m) {
   return new Promise((resolve) => {
     const W = S.wiz;
     S.coach = { slot: st.slot, cid: m.id };
-    API.arm_capture(st.slot, m.kind === "axis" ? "axis" : "button");
+    API.arm_capture(st.slot, m.kind === "axis" ? "axis" : "button", m.id);
     const finish = (v) => { API.cancel_capture(); S.capture = null; resolve(v); };
     S.capture = (got) => resolve(got);
     const dirWord = m.dir === "push" ? "straight in" : m.dir;

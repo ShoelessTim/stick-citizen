@@ -315,3 +315,24 @@ def test_rapid_trigger_rocks_up_and_down(tmp_path, monkeypatch):
     for st in api.get_state()["sticks"]:
         rt = {c["dir"]: c["id"] for c in st["controls"] if c["group"] == "Rapid trigger"}
         assert rt == {"up": "rapid-trigger", "down": "rapid-trigger-down"}
+
+
+def test_axis_springing_back_doesnt_count_for_the_next_step(tmp_path, monkeypatch):
+    """Learn the mini-stick's left-right axis, then arm up-down while it's still pushed:
+    the spring back to center must not be taken as up-down."""
+    api, hub = _api(tmp_path, monkeypatch)
+    slot = next(s for s in api.get_state()["sticks"] if s["side"] == "L")["slot"]
+    hub.axes = {"u1": [0.0] * 6}
+    api.arm_capture(slot, "axis", "mini-stick-a2-analog-x")
+    hub.axes = {"u1": [0, 0, 0, 0.95, 0, 0]}
+    cap = api.poll()["captured"]
+    api.learn(slot, "mini-stick-a2-analog-x", cap["keys"])
+    api.arm_capture(slot, "axis", "mini-stick-a2-analog-y")       # still held at 0.95
+    hub.axes = {"u1": [0.0] * 6}                                     # springs back to center
+    assert "captured" not in api.poll()
+    hub.axes = {"u1": [0, 0, 0, 0, 0.9, 0]}                          # now up-down
+    assert api.poll()["captured"]["key"] == "a4"
+    # re-learning the same control may take its own axis again
+    api.arm_capture(slot, "axis", "mini-stick-a2-analog-x")
+    hub.axes = {"u1": [0, 0, 0, 0.95, 0.9, 0]}
+    assert api.poll()["captured"]["key"] == "a3"

@@ -180,6 +180,7 @@ class Api:
         self._capture = None          # slot number (or 0 = any) waiting for a press
         self._capture_want = "button"  # "button" (buttons + hats) or "axis"
         self._capture_base = {}        # axis positions when an axis capture was armed
+        self._capture_cid = ""         # control being set up (its own axis may be re-learned)
         self._capture_keys = []        # inputs seen during the press being captured
         self._capture_down = set()
         self._capture_t0 = 0.0
@@ -374,9 +375,13 @@ class Api:
                 if not s["uid"] or self._capture not in (0, s["slot"]):
                     continue
                 base = self._capture_base.get(s["uid"], [])
+                t = self._tpl(s["slot"])
+                taken = {k for c in t.controls if c.id != self._capture_cid for k in c.inputs.values()}
                 for i, v in enumerate(axes.get(s["uid"], [])):
                     if i < len(base) and abs(v - base[i]) > 0.5:
                         sc = order.index(i) if i in order else i
+                        if f"a{sc}" in taken:
+                            continue
                         if sc < 8:
                             self._captured = {"slot": s["slot"], "key": f"a{sc}", "keys": [f"a{sc}"]}
                             self._capture = None
@@ -453,11 +458,14 @@ class Api:
         return short_label(key)
 
     # ----- stick map edits -----
-    def arm_capture(self, slot=0, want="button"):
+    def arm_capture(self, slot=0, want="button", cid=""):
         """The next press (or, with want="axis", the next big axis move) on `slot` (0 = any stick)
-        comes back from poll() as `captured`."""
+        comes back from poll() as `captured`. For an axis, axes already learned by another control
+        (`cid` = the one being set up) are ignored, so a stick springing back to center after the
+        last step doesn't count as this one."""
         self._capture = int(slot)
         self._capture_want = "axis" if want == "axis" else "button"
+        self._capture_cid = cid or ""
         self._capture_base = {uid: list(v) for uid, v in self._hub.snapshot()[1].items()}
         self._capture_keys, self._capture_down = [], set()
         self._captured = None

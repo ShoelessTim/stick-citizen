@@ -59,5 +59,6 @@ The built-in photos are VKB's product images. Shipping them in a public repo/rel
 
 - Tests: `SDL_VIDEODRIVER=dummy python -m pytest -q` (no Qt, no window needed)
 - Look at it: `python tools/preview.py --out shots/` then open the PNGs
+- Walk the Set up wizard end to end (real Api, fake sticks, every step pressed): `python tools/wizard_check.py . shots/wizard` (and `SCEN=pairs ...`). **Run before any wizard change ships.**
 - Release: bump `stick_citizen/__init__.py` `__version__` AND the `?v=` on app.css/app.js in `web/index.html` (a test checks they match), push to main → CI tests, builds `StickCitizen-vX.Y.Z.exe` (version also in Properties → Details via `tools/make_version_file.py`), cuts release `vX.Y.Z` with the exe and `StickCitizen-vX.Y.Z.zip`; the rolling `latest` pre-release gets `StickCitizen-vX.Y.Z-dev-<sha>.exe`
 - Repo: github.com/ShoelessTim/stick-citizen (moved from lowercase `shoelesstim`)
