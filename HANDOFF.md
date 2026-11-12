@@ -20,6 +20,16 @@ Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. T
 | Action names | `data/label_overrides.json` | Plain-English names over SC's labels |
 | Visual QA | `tools/preview.py` | Real Api + fake sticks → browser copy with a mock API → Playwright screenshots. **Run it and look before every UI release.** |
 
+## Start here (next session)
+
+1. Ask Tim how the v3.4.0 run went: Set up on both sticks, then Sublight applied. Get screenshots.
+2. Pull his learned maps from `%APPDATA%\StickCitizen\templates\` and bake the button numbers into `data/starters/*.json`.
+3. Fix dots/names he reports, then build "Tim's layout" with him and ship it in `data/layouts/`.
+
+**Parked, Tim's call:** more "inspired by" layouts (BuzZz Killer etc.). Sublight was built from the Subliminal chart Tim shared; we have no BuzZz chart, so one would be guesswork. Tim plans to ask both creators for permission once the app works; don't add more look-alikes before that.
+
+**Not yet verified on real hardware:** everything since v3.0.0 (built-in profiles, setup walkthrough, multi-input learn, axis capture for T1, layouts picker). Only checked with fake sticks via `tools/preview.py` and tests.
+
 ## Principle
 
 Don't encode hardware facts from chat. The stick is the source of truth: setup records every input each press fires, and Tim's learned map gets baked into the built-in profile. Names and dot positions are the only hand-made parts.
