@@ -190,7 +190,7 @@
      "v_weapon_countermeasure_noise_launch"
     ]
    },
-   "rapid-trigger-stage-2": {
+   "rapid-trigger-down": {
     "base": [
      "spaceship_defensive",
      "v_weapon_countermeasure_decoy_launch_panic"
@@ -402,7 +402,7 @@
      "v_light_amplification_toggle"
     ]
    },
-   "rapid-trigger-stage-2": {
+   "rapid-trigger-down": {
     "base": [
      "spaceship_movement",
      "v_space_brake"

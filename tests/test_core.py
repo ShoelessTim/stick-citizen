@@ -198,15 +198,15 @@ def test_setup_learns_multi_button_controls(tmp_path, monkeypatch):
     r = next(s for s in api.get_state()["sticks"] if s["side"] == "R")
     api.arm_capture(r["slot"])
     hub.press("u2", "b4")
-    hub.press("u2", "b5")                                   # rapid trigger fires two buttons
+    hub.press("u2", "b5")                                   # a button that fires two numbers (stages)
     assert "captured" not in api.poll()                    # still held: keep listening
     hub.press("u2", "b4", False)
     hub.press("u2", "b5", False)
     got = api.poll()["captured"]
     assert got["keys"] == ["b4", "b5"]
-    res = api.learn(r["slot"], "rapid-trigger", got["keys"])
+    res = api.learn(r["slot"], "side-button-b1", got["keys"])
     st = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])
-    stages = [c for c in st["controls"] if c["group"] == "Rapid trigger"]
+    stages = [c for c in st["controls"] if c["group"] == "Side button B1"]
     assert [c["inputs"]["base"] for c in stages] == ["b4", "b5"] and [c["label"] for c in stages] == ["stage 1", "stage 2"]
     # a hat direction only ever takes the first input (diagonals fire two)
     api.learn(r["slot"], "hat-a4-up", ["h1u", "h1r"])
@@ -305,5 +305,13 @@ def test_old_stick_maps_pick_up_new_builtin_controls(tmp_path, monkeypatch):
     assert "mini-stick-a2-analog-x" in ids and "mini-stick-a2-analog-y" in ids   # new in rev 2
     assert "base-f1" not in ids                                                   # removals stay removed
     assert t.controls[0].inputs == {"base": "b20"}                                # learning kept
-    assert t.starter_rev == 2
-    assert templates.load_template(name).starter_rev == 2                         # saved, not re-added
+    assert "rapid-trigger-down" in ids                                          # new in rev 3
+    assert t.starter_rev == 3
+    assert templates.load_template(name).starter_rev == 3                         # saved, not re-added
+
+
+def test_rapid_trigger_rocks_up_and_down(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    for st in api.get_state()["sticks"]:
+        rt = {c["dir"]: c["id"] for c in st["controls"] if c["group"] == "Rapid trigger"}
+        assert rt == {"up": "rapid-trigger", "down": "rapid-trigger-down"}

@@ -265,14 +265,30 @@
   },
   {
    "id": "rapid-trigger",
-   "label": "Rapid trigger",
-   "group": "",
-   "dir": "",
+   "label": "up",
+   "group": "Rapid trigger",
+   "dir": "up",
    "dot": [
     0.237,
     0.291
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "Rock the rapid trigger up and let go."
+  },
+  {
+   "id": "rapid-trigger-down",
+   "label": "down",
+   "group": "Rapid trigger",
+   "dir": "down",
+   "dot": [
+    0.237,
+    0.291
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "Rock the rapid trigger down and let go.",
+   "added": 3
   },
   {
    "id": "side-button-b1",
@@ -390,5 +406,6 @@
    "inputs": {},
    "how": "Turn the encoder one click down."
   }
- ]
+ ],
+ "starter_rev": 3
 }
