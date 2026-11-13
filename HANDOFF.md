@@ -1,6 +1,6 @@
 # Stick Citizen — Handoff
 
-**State (2026-11-12): v3.6.0 (PR, on top of the v3.5.2 logo now in main): Tim's real button numbers (VKB stock profile, both sticks identical; T1 = a2) are baked into `data/starters/*.json`, so Set up only asks for the mini-stick. Tim's pasted maps had NO mini-stick inputs on either stick: find out whether it sent nothing or he skipped it. Dots fixed per Tim: the grey thumb knob is Thumb hat C1; Side button B1 is hidden on the outside of the head (starter `moved` field moves dots in saved maps once). Right stick A1-as-mini-stick is on branch `wip/right-mini-stick` (no PR yet). Also: Set up learns the left mini-stick's analog mode as two axes (`mini-stick-a2-analog-x/-y`, kind axis, same group as the hat directions); "No analog mode" drops just those. Built-in profiles carry `starter_rev`; controls marked `added: N` are merged into existing user maps once, so removals stay removed. Rapid trigger is now a rocker group (`rapid-trigger` = up, `rapid-trigger-down`, added rev 3, per Tim); Sublight's old stage-2 binding moved to down. v3.5.1 shipped: fresh start (stick maps from older versions are moved to `%APPDATA%\StickCitizen\backups\` once, via `paths.DATA_REV`), "Start a stick over" in the Edit bar, page assets carry `?v=<version>` and the window runs in private mode so no stale screen, app icon (`assets/icon.ico`), and an Inno Setup installer (`installer/stick-citizen.iss`, built in CI as `StickCitizen-vX.Y.Z-Setup.exe`, per-user, Start Menu + desktop icon). Tim's v3.5.0 run came up "half-assed": old learned maps from 3.1-3.4 were being reused. v3.5.0: Set up is now a one-control-at-a-time wizard (photo zooms to the control, compass shows the direction, raw "stick is sending" readout, mouse-mode hint on the mini-stick, duplicate-press check, Back / Skip / "not on my stick", diagonals that are just two directions get dropped automatically). Picking a layout before setup now offers Set up first. "Copy my stick maps" (wizard end screen and Edit bar) puts the learned numbers on the clipboard. Tim's v3.4.0 run: setup never finished because the hats were hard to tell apart on the map, so Sublight had nothing to land on. Tim confirmed both sticks are on VKB's stock profile, so his run becomes the baked default.**
+**State (2026-11-12, evening): v3.6.0 is merged and released.** Tim's real button numbers (VKB stock profile; both sticks number identically, T1 = `a2`) are built into `data/starters/*.json`, so on a stock VKB setup Set up only asks for the mini-stick. Also in 3.6.0: mini-stick analog mode learned as two axes, rapid trigger as up/down, "No diagonals (4-way hat)", axis capture ignores axes another control owns (fixed spring-back bug), corrected dots (grey thumb knob = Thumb hat C1; Side button B1 hidden on the outside of the head), and saved maps upgrade via `starter_rev` / `added` / `moved`. v3.5.2: hex-crest logo (icon, header, installer, README).
 
 Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. This file is the engineering state. The public roadmap is in README → "Where it's going"; keep the two in step.
 
@@ -24,32 +24,32 @@ Plan and decisions live in the *Stick Citizen — Base Conditions* Claude Doc. T
 
 ## Start here (next session)
 
-1. Tim runs Set up on both sticks in v3.5.0, then pastes "Copy my stick maps" into chat (Claude's folder request for %APPDATA% was blocked, so the clipboard is the route).
-2. Bake those button numbers into `data/starters/*.json` (keep labels and dots); then setup is only for people who changed their VKB config.
-3. Fix dots/names he reports from the wizard zoom, then build "Tim's layout" with him and ship it in `data/layouts/`.
+1. **Right stick A1 = mini-stick.** Branch `wip/right-mini-stick` (no PR yet) turns the right profile's Hat A1 into "Mini-stick A1": 8 directions + push + 2 analog axes, ids stay `hat-a1-*` so Sublight keeps working, plus a merge rule that refreshes group/label/how in saved maps. It was cut before v3.6.0 merged: rebuild it on main (starter_rev 5, not 4), run tests + `tools/wizard_check.py`, open the PR. Then L and R have equal control counts.
+2. **Mini-stick didn't register.** Tim's pasted maps (v3.6.0) had NO mini-stick inputs on either stick. Ask: skipped, or did it send nothing? If nothing: check VKB mode (mouse mode sends mouse, not joystick) — this is the first case for the fix-it tool.
+3. **Premium grip profiles.** Tim's sticks are the Premium grip, not SCG Standard. His markups: `docs/hardware/premium-left-tim-markup.png`, `premium-right-tim-markup.png`. Names (both hands, mirrored): A4 = top hat; B4 = button by it; mini-stick (left A2, right A1; 8-way / mouse / analog "controller" mode); Side = side button, hidden on the outside of the head above the index finger; C4 = grey thumb knob (the app calls it Thumb hat C1); Pinky = lever on the back; rapid trigger rocks up/down; 4-way hats have no diagonals. **Waiting on Tim's own clean photos** (plain light background, 3/4 front, no flash, one stick per shot) — these also replace VKB's product photos before going public.
+4. **Fix-it tool ("how do I unbreak my layout").** Tim's next big want. Proposed first slice: press anything → three columns: what the stick sent (raw, or nothing → VKB/hardware), what SC does with it (binding, or nothing → SC), plain-English diagnosis (unbound / two actions on one input / mini-stick in mouse mode / bound to an input the stick never sends); plus a one-click layout scan for conflicts and dead bindings. **Open question to Tim:** when a layout breaks, is it usually "does nothing", "does the wrong thing", or "feels wrong" (inverted/drift/twitchy)?
+5. **Sublight:** one input is upside-down / inverted (likely an axis). Tim to name which.
 
-**Parked, Tim's call:** more "inspired by" layouts (BuzZz Killer etc.). Sublight was built from the Subliminal chart Tim shared; we have no BuzZz chart, so one would be guesswork. Tim plans to ask both creators for permission once the app works; don't add more look-alikes before that.
+**Parked, Tim's call:** more "inspired by" layouts (BuzZz Killer etc.); ask creators for permission first.
 
-**Not yet verified on real hardware:** everything since v3.0.0 (built-in profiles, setup wizard, multi-input learn, axis capture for T1, layouts picker, mouse-mode hint, clipboard copy in WebView2). Unknown until Tim's run: whether the mini-stick's hat mode sends 8 separate buttons, 4 buttons with diagonals as pairs, or a POV hat. The wizard handles all three. Only checked with fake sticks via `tools/preview.py` and tests.
+**Offered, not answered:** have CI build every PR (installer included) so Tim can test without a manual Actions run. Today PR builds were started by hand (Actions → Build Windows exe → Run workflow → branch).
+
+**Verified on Tim's hardware (v3.5.1–3.6.0):** setup wizard end to end, Sublight, all buttons/hats/triggers/base controls/T1 on both sticks. **Not yet:** mini-stick (any mode), right A1 mini-stick, Premium profiles.
 
 ## Principle
 
 Don't encode hardware facts from chat. The stick is the source of truth: setup records every input each press fires, and Tim's learned map gets baked into the built-in profile. Names and dot positions are the only hand-made parts.
 
-## Next steps (in order)
+## Later (after Start here)
 
-1. **Tim: run Set up on both sticks** (v3.1.0). Watch for: dots that sit off their button, controls the SCG Standard grip doesn't have, hats that report as POV hats (h1u…) vs buttons.
-2. **Bake defaults:** copy Tim's learned `inputs` from `%APPDATA%\StickCitizen\templates\vkbsim-gladiator-evo-*.json` into `data/starters/*.json` (keep labels and dots). Then setup is only for people who changed their VKB config. Add a "Use VKB defaults / Re-learn" choice.
-3. **Fix dot positions and names** from Tim's screenshots (head hats are best guesses; C1 especially). Known from Tim: T1 (center base wheel) is an axis, EN1 is an encoder, SW1 a switch; on the left stick A2 is the switchable 8-way hat / mouse mini-stick. Check whether the right stick's equivalent is also A2.
-   - Mini-stick in mouse mode sends mouse, not joystick input; the planned mode label/toast (Base Conditions) still to build.
-4. **Action catalog gaps:** `data/sc_actions.json` lacks some 4.x actions (e.g. `v_attack1_group1` weapon-group fire), so they show humanized names. Regenerate with `tools/make_catalog.py` from a current SC install.
-5. **Real Windows check of packaging:** pywebview + PyInstaller onefile (`--collect-all webview`) built in CI but only v3.0.0 has run on a real machine. Confirm WebView2, file dialogs, speech, and the Fly tab subprocess.
-6. **Layouts:** add "Tim's layout" once his is built (export from the app → `data/layouts/`). Subliminal / BuzZz Killer originals only with their permission (Tim will ask once the app works).
-7. Later: mini-stick mode label (mouse vs hat), print chart export, ring course as a tab, more device profiles.
+- Mini-stick mode label + toast (mouse vs hat vs analog), per Base Conditions.
+- Action catalog gaps: `data/sc_actions.json` lacks some 4.x actions (e.g. `v_attack1_group1`); regenerate with `tools/make_catalog.py` from a current SC install.
+- "Tim's layout" in `data/layouts/` once he builds it in the app.
+- Roadmap items (LEDs, on-foot analog play, export checklist) live in Base Conditions.
 
 ## Going public (target: v3.7)
 
-Repo stays private until Tim's CI and dev rules are in place. Before flipping it public: VKB photo permission (or own art), Subliminal permission for Sublight, BuzZz Killer permission if we add one. Permission emails drafted 2026-11-12.
+Repo stays private until Tim's CI and dev rules are in place. Tim wanted it public for his buddy (2026-11-12); held because of the two items below, and the buddy can use the installer file instead. Before flipping it public: VKB photo permission (or own art), Subliminal permission for Sublight, BuzZz Killer permission if we add one. Permission emails drafted 2026-11-12.
 
 ## Open risk (Tim decided, logged)
 
@@ -58,7 +58,8 @@ The built-in photos are VKB's product images. Shipping them in a public repo/rel
 ## How to work on it
 
 - Tests: `SDL_VIDEODRIVER=dummy python -m pytest -q` (no Qt, no window needed)
-- Look at it: `python tools/preview.py --out shots/` then open the PNGs
+- Look at it: `python tools/preview.py --out shots/` then open the PNGs (fake presses use b60+, clear of the built-in VKB numbers)
 - Walk the Set up wizard end to end (real Api, fake sticks, every step pressed): `python tools/wizard_check.py . shots/wizard` (and `SCEN=pairs ...`). **Run before any wizard change ships.**
 - Release: bump `stick_citizen/__init__.py` `__version__` AND the `?v=` on app.css/app.js in `web/index.html` (a test checks they match), push to main → CI tests, builds `StickCitizen-vX.Y.Z.exe` (version also in Properties → Details via `tools/make_version_file.py`), cuts release `vX.Y.Z` with the exe and `StickCitizen-vX.Y.Z.zip`; the rolling `latest` pre-release gets `StickCitizen-vX.Y.Z-dev-<sha>.exe`
+- Merging a branch: never take one side of HANDOFF.md wholesale (`checkout --ours` lost PR #1's notes once); merge it by hand.
 - Repo: github.com/ShoelessTim/stick-citizen (moved from lowercase `shoelesstim`)
