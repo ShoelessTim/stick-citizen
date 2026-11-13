@@ -439,6 +439,12 @@ def test_builtin_right_mini_stick_is_pov(tmp_path, monkeypatch):
     assert r["unassigned"] == ["hat-a1-push"]
 
 
+def templates_input(api, slot, cid):
+    from stick_citizen.templates import bind_key
+    k = api._tpl(slot).control(cid).inputs.get("base")
+    return bind_key(slot, k) if k else None
+
+
 def test_sublight_axes_and_on_foot(tmp_path, monkeypatch):
     """Tim 2026-11-12: yaw back to normal, throttle (left stick forward/back) inverted, and on foot the left
     mini-stick walks like a controller thumbstick, alongside its flight binds."""
@@ -446,6 +452,7 @@ def test_sublight_axes_and_on_foot(tmp_path, monkeypatch):
     api, hub = _api(tmp_path, monkeypatch)
     l, r = (next(s for s in api.get_state()["sticks"] if s["side"] == x) for x in "LR")
     api.learn(l["slot"], "mini-stick-a2-up", ["h1u"])            # left mini-stick set up as a POV hat
+    api.learn(l["slot"], "mini-stick-a2-push", ["b60"])
     api.apply_layout("sublight")
     xml = api._bset.to_xml("T")
     assert parse_actionmaps(xml).inverts == {(l["slot"], "flight_move_strafe_longitudinal")}   # SC options round-trip
@@ -453,5 +460,9 @@ def test_sublight_axes_and_on_foot(tmp_path, monkeypatch):
     up = api._bset.at((l["slot"], "hat", 1, "up"))
     assert {(b.map, b.action) for b in up} == {("spaceship_movement", "v_ifcs_speed_limiter_up"), ("player", "moveforward")}
     assert {b.action for b in api._bset.at((l["slot"], "hat", 1, "right"))} >= {"moveright"}
+    # hold-speed (sticky) throttle toggle is off the mini-stick push, which is also VKB's mode switch
+    swap = [k for k, v in api._bset.binds.items() for b in v if b.action == "v_ifcs_throttle_swap_mode"]
+    mini_push = templates_input(api, l["slot"], "mini-stick-a2-push")
+    assert mini_push and swap and all(k != mini_push for k in swap) and not api._bset.at(mini_push)
     api.apply_layout("blank")
     assert "invert" not in api._bset.to_xml("T")

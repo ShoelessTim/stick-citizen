@@ -318,12 +318,6 @@
      "v_ifcs_speed_limiter_toggle"
     ]
    },
-   "mini-stick-a2-push": {
-    "base": [
-     "spaceship_movement",
-     "v_ifcs_throttle_swap_mode"
-    ]
-   },
    "hat-a4-down": {
     "base": [
      "seat_general",
@@ -482,6 +476,12 @@
     "base": [
      "spaceship_salvage",
      "tractor_beam_vehicle_decrease_distance"
+    ]
+   },
+   "thumb-hat-c1-down": {
+    "base": [
+     "spaceship_movement",
+     "v_ifcs_throttle_swap_mode"
     ]
    }
   }
