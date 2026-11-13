@@ -24,6 +24,8 @@ UninstallDisplayIcon={app}\StickCitizen.exe
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+WizardImageFile=wizard-164x314.bmp,wizard-328x628.bmp
+WizardSmallImageFile=wizard-small-55.bmp,wizard-small-110.bmp
 CloseApplications=yes
 
 [Tasks]

@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo-lockup.png" alt="Stick Citizen" width="520"></p>
+
 # Stick Citizen
 
 See your HOSAS on screen, drag Star Citizen actions onto it, fly-test it, and save a layout SC can import. No Joystick Gremlin required.
