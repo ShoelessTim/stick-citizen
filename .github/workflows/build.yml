@@ -48,7 +48,7 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
           & $iscc "/DAppVersion=${{ steps.ver.outputs.num }}" "/DSourceExe=..\dist\${{ steps.ver.outputs.exe }}" installer\stick-citizen.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: StickCitizen-${{ steps.ver.outputs.ver }}
           path: |
