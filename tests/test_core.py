@@ -168,7 +168,10 @@ def test_builtin_vkb_profile(tmp_path, monkeypatch):
     assert {"Main trigger", "Hat A1", "Red button A2", "Pinky D1", "Base F1"} <= groups
     trig = [c for c in r["controls"] if c["group"] == "Main trigger"]
     assert [c["inputs"].get("base") for c in trig] == ["b1", "b2"]                  # VKB default stages
-    assert len(r["unassigned"]) > 20
+    # VKB stock numbers are built in (read off Tim's sticks); only the mini-stick / A1 hat is left to learn
+    assert set(r["unassigned"]) == {"hat-a1-up", "hat-a1-right", "hat-a1-down", "hat-a1-left", "hat-a1-push"}
+    ids = {c["id"]: c["inputs"].get("base") for c in r["controls"]}
+    assert ids["red-button-a2"] == "b3" and ids["rapid-trigger-down"] == "b22" and ids["wheel-t1"] == "a2"
     cid = r["unassigned"][0]
     res = api.assign_input(r["slot"], cid, "base", "b30")
     r2 = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])
@@ -198,15 +201,15 @@ def test_setup_learns_multi_button_controls(tmp_path, monkeypatch):
     r = next(s for s in api.get_state()["sticks"] if s["side"] == "R")
     api.arm_capture(r["slot"])
     hub.press("u2", "b4")
-    hub.press("u2", "b5")                                   # rapid trigger fires two buttons
+    hub.press("u2", "b5")                                   # a button that fires two numbers (stages)
     assert "captured" not in api.poll()                    # still held: keep listening
     hub.press("u2", "b4", False)
     hub.press("u2", "b5", False)
     got = api.poll()["captured"]
     assert got["keys"] == ["b4", "b5"]
-    res = api.learn(r["slot"], "rapid-trigger", got["keys"])
+    res = api.learn(r["slot"], "side-button-b1", got["keys"])
     st = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])
-    stages = [c for c in st["controls"] if c["group"] == "Rapid trigger"]
+    stages = [c for c in st["controls"] if c["group"] == "Side button B1"]
     assert [c["inputs"]["base"] for c in stages] == ["b4", "b5"] and [c["label"] for c in stages] == ["stage 1", "stage 2"]
     # a hat direction only ever takes the first input (diagonals fire two)
     api.learn(r["slot"], "hat-a4-up", ["h1u", "h1r"])
@@ -268,3 +271,91 @@ def test_fresh_start_backs_up_old_maps_once(tmp_path, monkeypatch):
     (tmp_path / "templates" / "new.json").write_text("{}")
     assert paths.fresh_start() is False                     # only once
     assert (tmp_path / "templates" / "new.json").exists()
+
+
+def test_mini_stick_analog_mode_learns_two_axes(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    left = next(s for s in api.get_state()["sticks"] if s["side"] == "L")
+    mini = [c for c in left["controls"] if c["group"] == "Mini-stick A2"]
+    analog = [c for c in mini if c["kind"] == "axis"]
+    assert [c["id"] for c in analog] == ["mini-stick-a2-analog-x", "mini-stick-a2-analog-y"]
+    assert len([c for c in mini if c["dir"]]) == 9                       # hat mode: 8 directions + push
+    slot = left["slot"]
+    for cid, idx in (("mini-stick-a2-analog-x", 3), ("mini-stick-a2-analog-y", 4)):
+        hub.axes = {"u1": [0.0] * 6}
+        api.arm_capture(slot, "axis")
+        hub.axes = {"u1": [0.9 if i == idx else 0.0 for i in range(6)]}   # push it all the way one way
+        cap = api.poll()["captured"]
+        assert cap["key"] == f"a{idx}"
+        res = api.learn(slot, cid, cap["keys"])
+    l2 = next(s for s in res["state"]["sticks"] if s["slot"] == slot)
+    got = {c["id"]: c["inputs"].get("base") for c in l2["controls"] if c["kind"] == "axis" and c["group"] == "Mini-stick A2"}
+    assert got == {"mini-stick-a2-analog-x": "a3", "mini-stick-a2-analog-y": "a4"}
+
+
+def test_old_stick_maps_pick_up_new_builtin_controls(tmp_path, monkeypatch):
+    import json
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    name = "VKBsim Gladiator EVO L"
+    starter = templates.starter_for(name)
+    old = {"name": name, "image": "", "controls": [c for c in starter["controls"] if c.get("added", 1) == 1
+                                                   and c["id"] != "base-f1"]}    # user took F1 off ("not on my stick")
+    old["controls"][0] = dict(old["controls"][0], inputs={"base": "b20"})          # and learned something
+    (tmp_path / f"{templates._slug(name)}.json").write_text(json.dumps(old), encoding="utf-8")
+    t = templates.load_template(name)
+    ids = [c.id for c in t.controls]
+    assert "mini-stick-a2-analog-x" in ids and "mini-stick-a2-analog-y" in ids   # new in rev 2
+    assert "base-f1" not in ids                                                   # removals stay removed
+    assert t.controls[0].inputs == {"base": "b20"}                                # learning kept
+    assert "rapid-trigger-down" in ids                                          # new in rev 3
+    assert t.starter_rev == 4
+    assert templates.load_template(name).starter_rev == 4                         # saved, not re-added
+
+
+def test_rapid_trigger_rocks_up_and_down(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    for st in api.get_state()["sticks"]:
+        rt = {c["dir"]: c["id"] for c in st["controls"] if c["group"] == "Rapid trigger"}
+        assert rt == {"up": "rapid-trigger", "down": "rapid-trigger-down"}
+
+
+def test_axis_springing_back_doesnt_count_for_the_next_step(tmp_path, monkeypatch):
+    """Learn the mini-stick's left-right axis, then arm up-down while it's still pushed:
+    the spring back to center must not be taken as up-down."""
+    api, hub = _api(tmp_path, monkeypatch)
+    slot = next(s for s in api.get_state()["sticks"] if s["side"] == "L")["slot"]
+    hub.axes = {"u1": [0.0] * 6}
+    api.arm_capture(slot, "axis", "mini-stick-a2-analog-x")
+    hub.axes = {"u1": [0, 0, 0, 0.95, 0, 0]}
+    cap = api.poll()["captured"]
+    api.learn(slot, "mini-stick-a2-analog-x", cap["keys"])
+    api.arm_capture(slot, "axis", "mini-stick-a2-analog-y")       # still held at 0.95
+    hub.axes = {"u1": [0.0] * 6}                                     # springs back to center
+    assert "captured" not in api.poll()
+    hub.axes = {"u1": [0, 0, 0, 0, 0.9, 0]}                          # now up-down
+    assert api.poll()["captured"]["key"] == "a4"
+    # re-learning the same control may take its own axis again
+    api.arm_capture(slot, "axis", "mini-stick-a2-analog-x")
+    hub.axes = {"u1": [0, 0, 0, 0.95, 0.9, 0]}
+    assert api.poll()["captured"]["key"] == "a3"
+
+
+def test_side_button_and_thumb_hat_dots_follow_the_fix(tmp_path, monkeypatch):
+    """Tim 2026-11-12: the grey thumb knob is Thumb hat C1; Side button B1 is hidden on the outside of the head.
+    Saved maps from before the fix get the corrected dots and keep their numbers."""
+    import json
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    for name in ("VKBsim Gladiator EVO L", "VKBsim Gladiator EVO R"):
+        st = templates.starter_for(name)
+        c1 = next(c for c in st["controls"] if c["id"] == "thumb-hat-c1-up")
+        sb = next(c for c in st["controls"] if c["id"] == "side-button-b1")
+        assert c1["dot"][1] > 0.3 and sb["dot"][1] < 0.2                       # knob low on the grip, button up on the head
+        old = [dict(c, dot=[0.5, 0.5], inputs={"base": "b4"} if c["id"] == "side-button-b1" else c["inputs"])
+               for c in st["controls"] if c.get("added", 1) == 1]
+        (tmp_path / f"{templates._slug(name)}.json").write_text(json.dumps({"name": name, "starter_rev": 3, "controls": old}), encoding="utf-8")
+        t = templates.load_template(name)
+        assert t.control("side-button-b1").dot == sb["dot"] and t.control("side-button-b1").inputs == {"base": "b4"}
+        assert t.control("thumb-hat-c1-up").dot == c1["dot"]
+        assert t.control("hat-a4-up").dot == [0.5, 0.5]                          # untouched controls keep the user's dot

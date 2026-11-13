@@ -102,6 +102,7 @@ class Template:
         self.starter_image = None       # built-in profile photo, used when the user hasn't set one
         self.controls: list[Control] = controls or []
         self.path = path
+        self.starter_rev = 1            # which built-in profile revision this map has already taken in
 
     def claimed(self) -> set[str]:
         return {k for c in self.controls for k in c.inputs.values()}
@@ -162,7 +163,8 @@ class Template:
             c.dot = list(dot)
 
     def to_json(self):
-        return {"name": self.name, "image": self.image, "controls": [c.to_json() for c in self.controls]}
+        return {"name": self.name, "image": self.image, "starter_rev": self.starter_rev,
+                "controls": [c.to_json() for c in self.controls]}
 
     def save(self):
         d = templates_dir()
@@ -179,7 +181,9 @@ def from_json(raw: dict, device_name: str, path=None) -> Template:
         controls.append(ctl)
     # v2 files ("tiles") carry nothing over: the built-in profile replaces their grid and photo.
     image = "" if "tiles" in raw else raw.get("image", "")
-    return Template(raw.get("name") or device_name, image, controls, path)
+    t = Template(raw.get("name") or device_name, image, controls, path)
+    t.starter_rev = int(raw.get("starter_rev", 1))
+    return t
 
 
 def starter_for(device_name: str):
@@ -203,8 +207,23 @@ def load_template(device_name: str) -> Template:
         t = Template(device_name, path=p)
     st = starter_for(device_name)
     if st:
+        rev = int(st.get("starter_rev", 1))
         if not t.controls:                   # new stick, or a v2 file
             t.controls = from_json(st, device_name).controls
+            t.starter_rev = rev
+        elif rev > t.starter_rev:            # controls added to the built-in profile since this map was made
+            have = {c.id for c in t.controls}
+            fresh = {c["id"]: c for c in st.get("controls", [])}
+            for c in t.controls:                 # controls we moved on the picture move in saved maps too
+                f = fresh.get(c.id)
+                if f and f.get("moved", 0) > t.starter_rev and f.get("dot"):
+                    c.dot = list(f["dot"])
+            for c in st.get("controls", []):
+                if c.get("added", 1) > t.starter_rev and c.get("id") not in have:
+                    t.controls.append(from_json({"controls": [c]}, device_name).controls[0])
+            t.starter_rev = rev
+            if t.path:
+                t.save()
         img = Path(__file__).parent / "data" / "starters" / st.get("image", "")
         if st.get("image") and img.is_file():
             t.starter_image = img
