@@ -1,0 +1,33 @@
+name: Bug report
+description: Something in Stick Citizen doesn't work
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Stick Citizen version
+      description: In the window title or the exe's file name, e.g. v3.7.0
+    validations:
+      required: true
+  - type: input
+    id: sticks
+    attributes:
+      label: Sticks and grips
+      description: e.g. VKB Gladiator NXT EVO left + right, Premium grip, stock VKB profile
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: files
+    attributes:
+      label: Files that help
+      description: Drag in a screenshot, and for binding problems the layout file you used. "Copy my stick maps" (in Edit) puts your stick map on the clipboard to paste here.
