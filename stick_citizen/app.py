@@ -10,7 +10,7 @@ from pathlib import Path
 import pygame
 
 from . import config as configmod
-from .actionmaps import AXIS_NAMES, Profile, find_actionmaps, load_profile
+from .actionmaps import AXIS_NAMES, INVERT_OPTION, Profile, find_actionmaps, load_profile
 from .callouts import describe, humanize, spoken
 from .devices import DeviceManager, hat_dirs
 from .sim import Controls, Course, Guns, Ship, dot, length, norm, sub
@@ -211,7 +211,7 @@ class App:
             if abs(v - last) > 0.7:
                 self.axis_called[key] = v
                 self.callout(f"{humanize(b.action)}  ({b.input.label()})", DIM, big=False)
-            if b.action in invert:
+            if b.action in invert or (b.input.instance, INVERT_OPTION.get(b.action)) in self.profile.inverts:
                 v = -v
             if "throttle" in b.action.lower():
                 throttle = max(0.0, min(1.0, (1.0 - v) / 2.0))

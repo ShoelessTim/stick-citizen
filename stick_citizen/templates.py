@@ -199,6 +199,35 @@ def starter_for(device_name: str):
     return None
 
 
+POV_KEY = re.compile(r"^h(\d+)[udlr]$")
+CARDINALS = {"up": "u", "right": "r", "down": "d", "left": "l"}
+
+
+def fix_pov_hats(t) -> bool:
+    """A hat that reports as a POV hat (h1u, h1r, ...) is self-describing: its four directions are h<n>u/r/d/l and
+    a diagonal is two of them at once, so there is no separate diagonal to learn. Fills the four directions and
+    drops the diagonals. Also repairs maps where a diagonal was learned as one POV direction (v3.7.0 Set up)."""
+    changed = False
+    groups = {}
+    for c in t.controls:
+        if c.dir and c.group:
+            groups.setdefault(c.group, []).append(c)
+    for members in groups.values():
+        pov = next((m.group(1) for c in members if (m := POV_KEY.match(c.inputs.get("base", "")))), None)
+        if pov is None:
+            continue
+        for c in list(members):
+            if c.dir in CARDINALS:
+                want, have = f"h{pov}{CARDINALS[c.dir]}", c.inputs.get("base", "")
+                if have != want and (not have or POV_KEY.match(have)):
+                    c.inputs["base"] = want
+                    changed = True
+            elif "-" in c.dir and (not c.inputs.get("base") or POV_KEY.match(c.inputs.get("base", ""))):
+                t.remove_control(c)
+                changed = True
+    return changed
+
+
 def load_template(device_name: str) -> Template:
     p = templates_dir() / f"{_slug(device_name)}.json"
     try:
@@ -229,6 +258,8 @@ def load_template(device_name: str) -> Template:
             t.starter_rev = rev
             if t.path:
                 t.save()
+        if fix_pov_hats(t) and t.path:
+            t.save()
         img = Path(__file__).parent / "data" / "starters" / st.get("image", "")
         if st.get("image") and img.is_file():
             t.starter_image = img

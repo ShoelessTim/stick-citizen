@@ -1,7 +1,7 @@
 {
  "id": "sublight",
  "name": "Sublight",
- "credit": "Inspired by Subliminal's Enhanced dual VKB Gladiator NXT layout (subliminal.gg). Rebuilt from scratch for direct play, no Joystick Gremlin; base and \u21e7 layers only.",
+ "credit": "Inspired by Subliminal's Enhanced dual VKB Gladiator NXT layout (subliminal.gg). Rebuilt from scratch for direct play, no Joystick Gremlin; base and ⇧ layers only.",
  "description": "Combat-ready dual-stick layout: weapons and targeting on the right, flight and power on the left.",
  "for": "VKB Gladiator NXT EVO L + R",
  "sides": {
@@ -466,7 +466,8 @@
   "R": {
    "0": [
     "spaceship_movement",
-    "v_yaw"
+    "v_yaw",
+    "invert"
    ],
    "1": [
     "spaceship_movement",
