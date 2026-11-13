@@ -661,14 +661,16 @@ class Api:
                 c = t.control(cid)
                 if c is None:            # a control this stick doesn't have (removed in setup): nothing to wait for
                     continue
-                for layer, v in layers.items():
+                for layer, val in layers.items():
                     key = c.inputs.get(layer)
-                    if key and self._catalog.get(v[0], v[1]):
-                        self._bset.binds.setdefault(bind_key(s["slot"], key), []).append(
-                            Bound(v[0], v[1], v[2] if len(v) > 2 else self._catalog.default_activation(v[0], v[1])))
-                        done += 1
-                    else:
-                        waiting += 1
+                    # one action ["map", "action"(, "activation")], or several on one input (flight + on foot)
+                    for v in (val if val and isinstance(val[0], list) else [val]):
+                        if key and self._catalog.get(v[0], v[1]):
+                            self._bset.binds.setdefault(bind_key(s["slot"], key), []).append(
+                                Bound(v[0], v[1], v[2] if len(v) > 2 else self._catalog.default_activation(v[0], v[1])))
+                            done += 1
+                        else:
+                            waiting += 1
             for slot_axis, v in d.get("axes", {}).get(side, {}).items():
                 self._bset.binds.setdefault((s["slot"], "axis", int(slot_axis), ""), []).append(Bound(v[0], v[1], ""))
                 if "invert" in v[2:] and v[1] in INVERT_OPTION:     # e.g. ["spaceship_movement", "v_yaw", "invert"]

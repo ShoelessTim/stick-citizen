@@ -439,14 +439,19 @@ def test_builtin_right_mini_stick_is_pov(tmp_path, monkeypatch):
     assert r["unassigned"] == ["hat-a1-push"]
 
 
-def test_sublight_yaw_is_inverted_in_the_export(tmp_path, monkeypatch):
-    """Tim 2026-11-12: Sublight's yaw went the wrong way. SC keeps inversion as a joystick option."""
+def test_sublight_axes_and_on_foot(tmp_path, monkeypatch):
+    """Tim 2026-11-12: yaw back to normal, throttle (left stick forward/back) inverted, and on foot the left
+    mini-stick walks like a controller thumbstick, alongside its flight binds."""
     from stick_citizen.actionmaps import parse_actionmaps
     api, hub = _api(tmp_path, monkeypatch)
-    r = next(s for s in api.get_state()["sticks"] if s["side"] == "R")
+    l, r = (next(s for s in api.get_state()["sticks"] if s["side"] == x) for x in "LR")
+    api.learn(l["slot"], "mini-stick-a2-up", ["h1u"])            # left mini-stick set up as a POV hat
     api.apply_layout("sublight")
     xml = api._bset.to_xml("T")
-    assert f'<options type="joystick" instance="{r["slot"]}"' in xml and '<flight_move_yaw invert="1"/>' in xml
-    assert parse_actionmaps(xml).inverts == {(r["slot"], "flight_move_yaw")}             # round-trips
+    assert parse_actionmaps(xml).inverts == {(l["slot"], "flight_move_strafe_longitudinal")}   # SC options round-trip
+    assert "flight_move_yaw" not in xml
+    up = api._bset.at((l["slot"], "hat", 1, "up"))
+    assert {(b.map, b.action) for b in up} == {("spaceship_movement", "v_ifcs_speed_limiter_up"), ("player", "moveforward")}
+    assert {b.action for b in api._bset.at((l["slot"], "hat", 1, "right"))} >= {"moveright"}
     api.apply_layout("blank")
     assert "invert" not in api._bset.to_xml("T")
