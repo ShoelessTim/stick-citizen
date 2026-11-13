@@ -1,0 +1,11 @@
+# Same light setup as RouteMe:
+# - Dependabot *alerts* + security-fix PRs come from repo settings (no version-bump spam)
+# - Only GitHub Actions get routine bumps, monthly, so CI doesn't rot
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    labels: [dependencies, github-actions]

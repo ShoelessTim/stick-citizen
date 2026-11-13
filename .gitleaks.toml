@@ -1,0 +1,5 @@
+# Gitleaks config. Uses the default rules; allowlist only known-safe paths here.
+title = "stick-citizen"
+
+[extend]
+useDefault = true
