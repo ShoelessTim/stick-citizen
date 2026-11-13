@@ -31,8 +31,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 
 /* ----- header ----- */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 24px; border-bottom: 1px solid rgba(63,208,255,.1); flex-wrap: wrap; }
-.brand { display: flex; align-items: center; gap: 10px; color: var(--cyan); }
-.brand span { color: var(--text); font: 700 15px var(--display); letter-spacing: .18em; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .mark { width: 34px; height: 34px; flex: none; }
+.brand .word { display: flex; flex-direction: column; line-height: 1; gap: 3px; }
+.brand .word b { color: #E8ECF1; font: 700 15px var(--display); letter-spacing: .14em; }
+.brand .word i { color: #F0A43A; font: 400 10px var(--display); font-style: normal; letter-spacing: .42em; }
 .right { display: flex; align-items: center; gap: 8px; }
 .seg { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(255,255,255,.04); }
 .seg button { border: 0; background: transparent; color: #9fb0c4; padding: 8px 16px; border-radius: 8px; font-weight: 500; transition: background .15s, color .15s; }
