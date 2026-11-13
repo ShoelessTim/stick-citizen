@@ -195,12 +195,14 @@
    "group": "Thumb hat C1",
    "dir": "up",
    "dot": [
-    0.215,
-    0.131
+    0.369,
+    0.336
    ],
    "inputs": {
     "base": "b16"
-   }
+   },
+   "moved": 4,
+   "how": "The grey thumb knob."
   },
   {
    "id": "thumb-hat-c1-right",
@@ -208,12 +210,14 @@
    "group": "Thumb hat C1",
    "dir": "right",
    "dot": [
-    0.215,
-    0.131
+    0.369,
+    0.336
    ],
    "inputs": {
     "base": "b17"
-   }
+   },
+   "moved": 4,
+   "how": "The grey thumb knob."
   },
   {
    "id": "thumb-hat-c1-down",
@@ -221,12 +225,14 @@
    "group": "Thumb hat C1",
    "dir": "down",
    "dot": [
-    0.215,
-    0.131
+    0.369,
+    0.336
    ],
    "inputs": {
     "base": "b18"
-   }
+   },
+   "moved": 4,
+   "how": "The grey thumb knob."
   },
   {
    "id": "thumb-hat-c1-left",
@@ -234,12 +240,14 @@
    "group": "Thumb hat C1",
    "dir": "left",
    "dot": [
-    0.215,
-    0.131
+    0.369,
+    0.336
    ],
    "inputs": {
     "base": "b19"
-   }
+   },
+   "moved": 4,
+   "how": "The grey thumb knob."
   },
   {
    "id": "thumb-hat-c1-push",
@@ -247,12 +255,14 @@
    "group": "Thumb hat C1",
    "dir": "push",
    "dot": [
-    0.215,
-    0.131
+    0.369,
+    0.336
    ],
    "inputs": {
     "base": "b20"
-   }
+   },
+   "moved": 4,
+   "how": "The grey thumb knob."
   },
   {
    "id": "red-button-a2",
@@ -332,12 +342,14 @@
    "group": "",
    "dir": "",
    "dot": [
-    0.369,
-    0.336
+    0.215,
+    0.131
    ],
    "inputs": {
     "base": "b4"
-   }
+   },
+   "moved": 4,
+   "how": "It's on the outside of the head, above your index finger (hidden behind the head in the picture). Press it once."
   },
   {
    "id": "pinky-d1",
@@ -463,5 +475,5 @@
    "how": "Turn the encoder one click down."
   }
  ],
- "starter_rev": 3
+ "starter_rev": 4
 }

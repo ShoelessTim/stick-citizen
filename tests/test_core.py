@@ -309,8 +309,8 @@ def test_old_stick_maps_pick_up_new_builtin_controls(tmp_path, monkeypatch):
     assert "base-f1" not in ids                                                   # removals stay removed
     assert t.controls[0].inputs == {"base": "b20"}                                # learning kept
     assert "rapid-trigger-down" in ids                                          # new in rev 3
-    assert t.starter_rev == 3
-    assert templates.load_template(name).starter_rev == 3                         # saved, not re-added
+    assert t.starter_rev == 4
+    assert templates.load_template(name).starter_rev == 4                         # saved, not re-added
 
 
 def test_rapid_trigger_rocks_up_and_down(tmp_path, monkeypatch):
@@ -339,3 +339,23 @@ def test_axis_springing_back_doesnt_count_for_the_next_step(tmp_path, monkeypatc
     api.arm_capture(slot, "axis", "mini-stick-a2-analog-x")
     hub.axes = {"u1": [0, 0, 0, 0.95, 0.9, 0]}
     assert api.poll()["captured"]["key"] == "a3"
+
+
+def test_side_button_and_thumb_hat_dots_follow_the_fix(tmp_path, monkeypatch):
+    """Tim 2026-11-12: the grey thumb knob is Thumb hat C1; Side button B1 is hidden on the outside of the head.
+    Saved maps from before the fix get the corrected dots and keep their numbers."""
+    import json
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    for name in ("VKBsim Gladiator EVO L", "VKBsim Gladiator EVO R"):
+        st = templates.starter_for(name)
+        c1 = next(c for c in st["controls"] if c["id"] == "thumb-hat-c1-up")
+        sb = next(c for c in st["controls"] if c["id"] == "side-button-b1")
+        assert c1["dot"][1] > 0.3 and sb["dot"][1] < 0.2                       # knob low on the grip, button up on the head
+        old = [dict(c, dot=[0.5, 0.5], inputs={"base": "b4"} if c["id"] == "side-button-b1" else c["inputs"])
+               for c in st["controls"] if c.get("added", 1) == 1]
+        (tmp_path / f"{templates._slug(name)}.json").write_text(json.dumps({"name": name, "starter_rev": 3, "controls": old}), encoding="utf-8")
+        t = templates.load_template(name)
+        assert t.control("side-button-b1").dot == sb["dot"] and t.control("side-button-b1").inputs == {"base": "b4"}
+        assert t.control("thumb-hat-c1-up").dot == c1["dot"]
+        assert t.control("hat-a4-up").dot == [0.5, 0.5]                          # untouched controls keep the user's dot

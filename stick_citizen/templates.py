@@ -213,6 +213,11 @@ def load_template(device_name: str) -> Template:
             t.starter_rev = rev
         elif rev > t.starter_rev:            # controls added to the built-in profile since this map was made
             have = {c.id for c in t.controls}
+            fresh = {c["id"]: c for c in st.get("controls", [])}
+            for c in t.controls:                 # controls we moved on the picture move in saved maps too
+                f = fresh.get(c.id)
+                if f and f.get("moved", 0) > t.starter_rev and f.get("dot"):
+                    c.dot = list(f["dot"])
             for c in st.get("controls", []):
                 if c.get("added", 1) > t.starter_rev and c.get("id") not in have:
                     t.controls.append(from_json({"controls": [c]}, device_name).controls[0])

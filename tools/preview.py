@@ -52,7 +52,7 @@ def build(workdir: Path, learned=True):
     if learned:   # what the one-time "Set up" walkthrough produces
         for side, slot in by_side.items():
             stick = next(x for x in api.get_state()["sticks"] if x["slot"] == slot)
-            n = 3
+            n = 60   # clear of the built-in VKB numbers
             for cid in stick["unassigned"]:
                 api.assign_input(slot, cid, "base", f"b{n}")
                 n += 1
@@ -134,12 +134,12 @@ def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
             l = "S.state.sticks.find(s => s.side === 'L')"
             snap("0-fresh-layout-needs-setup", "layoutsFlow().then(() => document.querySelectorAll('.lay')[1].click())", 700)
             snap("0-wizard-hat-up", "closeModal(); setTimeout(() => setupFlow(%s), 0)" % l, 900)
-            # learn up/right/down/left, leaving the mini-stick push step; then fake a mouse move
-            for k in ("b20", "b21", "b22", "b23"):
+            # (stock VKB numbers are built in, so setup starts at the mini-stick) learn up/right/down/left, leaving push; then fake a mouse move
+            for k in ("b60", "b61", "b62", "b63"):   # clear of the built-in VKB numbers
                 pg.evaluate("(() => { const m = %s.controls.find(c => c.id === S.wiz.todo[S.wiz.i].id); m.inputs.base = '%s'; const f = S.capture; S.capture = null; f({slot: S.wiz.slot, key: '%s', keys: ['%s']}); })()" % (l, k, k, k))
                 pg.wait_for_timeout(150)
-            snap("0-wizard-mini-stick", "window.dispatchEvent(new MouseEvent('mousemove', {movementX: 9, movementY: 3})); window.__events.push({slot: S.wiz.slot, key: 'b21', on: true}, {slot: S.wiz.slot, key: 'b21', on: false})", 500)
-            snap("0-wizard-duplicate", "(() => { const f = S.capture; S.capture = null; f({slot: S.wiz.slot, key: 'b20', keys: ['b20']}); })()", 500)
+            snap("0-wizard-mini-stick", "window.dispatchEvent(new MouseEvent('mousemove', {movementX: 9, movementY: 3})); window.__events.push({slot: S.wiz.slot, key: 'b61', on: true}, {slot: S.wiz.slot, key: 'b61', on: false})", 500)
+            snap("0-wizard-duplicate", "(() => { const f = S.capture; S.capture = null; f({slot: S.wiz.slot, key: 'b60', keys: ['b60']}); })()", 500)
             # a diagonal step on a regular hat offers "No diagonals (4-way hat)"
             snap("0-wizard-diagonal", "S.wiz.i = S.wiz.todo.findIndex(t => t.id === 'mini-stick-a2-up-right'); document.querySelector('#wizard .wz-btns .btn').click()", 700)
             # jump to the mini-stick's analog step ("Try again" on the duplicate prompt re-enters the loop at W.i)
