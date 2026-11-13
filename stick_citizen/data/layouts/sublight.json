@@ -2,7 +2,7 @@
  "id": "sublight",
  "name": "Sublight",
  "credit": "Inspired by Subliminal's Enhanced dual VKB Gladiator NXT layout (subliminal.gg). Rebuilt from scratch for direct play, no Joystick Gremlin; base and ⇧ layers only.",
- "description": "Combat-ready dual-stick layout: weapons and targeting on the right, flight and power on the left.",
+ "description": "Combat-ready dual-stick layout: weapons and targeting on the right, flight and power on the left. On foot, the left mini-stick (hat mode) walks like a controller thumbstick; diagonals come from two directions at once.",
  "for": "VKB Gladiator NXT EVO L + R",
  "sides": {
   "R": {
@@ -266,38 +266,56 @@
   "L": {
    "mini-stick-a2-up": {
     "base": [
-     "spaceship_movement",
-     "v_ifcs_speed_limiter_up"
+     [
+      "spaceship_movement",
+      "v_ifcs_speed_limiter_up"
+     ],
+     [
+      "player",
+      "moveforward"
+     ]
     ]
    },
    "mini-stick-a2-down": {
     "base": [
-     "spaceship_movement",
-     "v_ifcs_speed_limiter_down"
+     [
+      "spaceship_movement",
+      "v_ifcs_speed_limiter_down"
+     ],
+     [
+      "player",
+      "moveback"
+     ]
     ]
    },
    "mini-stick-a2-right": {
     "base": [
-     "spaceship_movement",
-     "v_strafe_trim_set_100_short"
+     [
+      "spaceship_movement",
+      "v_strafe_trim_set_100_short"
+     ],
+     [
+      "player",
+      "moveright"
+     ]
     ]
    },
    "mini-stick-a2-left": {
     "base": [
-     "spaceship_movement",
-     "v_strafe_trim_reset_short"
+     [
+      "spaceship_movement",
+      "v_strafe_trim_reset_short"
+     ],
+     [
+      "player",
+      "moveleft"
+     ]
     ]
    },
    "mini-stick-a2-up-right": {
     "base": [
      "spaceship_movement",
      "v_ifcs_speed_limiter_toggle"
-    ]
-   },
-   "mini-stick-a2-push": {
-    "base": [
-     "spaceship_movement",
-     "v_ifcs_throttle_swap_mode"
     ]
    },
    "hat-a4-down": {
@@ -459,6 +477,12 @@
      "spaceship_salvage",
      "tractor_beam_vehicle_decrease_distance"
     ]
+   },
+   "thumb-hat-c1-down": {
+    "base": [
+     "spaceship_movement",
+     "v_ifcs_throttle_swap_mode"
+    ]
    }
   }
  },
@@ -466,8 +490,7 @@
   "R": {
    "0": [
     "spaceship_movement",
-    "v_yaw",
-    "invert"
+    "v_yaw"
    ],
    "1": [
     "spaceship_movement",
@@ -485,7 +508,8 @@
    ],
    "1": [
     "spaceship_movement",
-    "v_strafe_longitudinal"
+    "v_strafe_longitudinal",
+    "invert"
    ],
    "5": [
     "spaceship_movement",
