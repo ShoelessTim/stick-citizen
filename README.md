@@ -33,6 +33,8 @@ Star Citizen can't do joystick shift layers or stick-to-mouse on its own; those 
 
 The A1 mini-stick has three firmware modes, switched by pressing it: mouse, 8-way hat, and analog. Mouse mode sends mouse movement, not joystick input, so Stick Citizen can't see it; switch to hat or analog mode to bind it.
 
+On foot, Sublight walks with the left mini-stick in hat mode (like a controller's left thumbstick). For looking around, put the right mini-stick in mouse mode: Star Citizen has no joystick look action on foot, and mouse mode reads as the mouse.
+
 ## Where it's going
 
 **Next up**
