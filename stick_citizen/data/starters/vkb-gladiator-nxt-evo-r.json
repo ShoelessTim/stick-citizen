@@ -1,63 +1,168 @@
 {
- "name": "VKB Gladiator NXT EVO SCG R",
+ "name": "VKB Gladiator NXT EVO Premium R",
  "match": "gladiator.*\\br\\b",
  "image": "vkb-gladiator-nxt-evo-r.png",
- "note": "Built-in profile. Names follow VKB's SCG templates; trigger stages 1/2 are VKB defaults; button numbers are VKB's stock profile as read off Tim's sticks with Set up (2026-11-12, v3.6.0); only controls left empty need Set up. Photos: VKB product images.",
+ "note": "Built-in profile for the Premium grip. Names are the labels printed on the stick (A1-A4) and Tim's names for the unlabeled ones (Thumb hat C4, Side button, Pinky lever). Button numbers are VKB's stock profile as read off Tim's sticks with Set up (2026-11-12); only the mini-stick needs Set up. Both sticks: A1 is the 8-way / mouse / analog mini-stick (left-stick ids stay mini-stick-a2-*, right-stick ids hat-a1-*, so layouts keep working). Photos: Tim's own (ShoelessTim), 2026-11-12.",
  "controls": [
   {
    "id": "hat-a1-up",
    "label": "up",
-   "group": "Hat A1",
+   "group": "Mini-stick A1",
    "dir": "up",
    "dot": [
-    0.265,
-    0.083
+    0.158,
+    0.122
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it up.",
+   "moved": 5
+  },
+  {
+   "id": "hat-a1-up-right",
+   "label": "up-right",
+   "group": "Mini-stick A1",
+   "dir": "up-right",
+   "dot": [
+    0.158,
+    0.122
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it up and right.",
+   "added": 5,
+   "moved": 5
   },
   {
    "id": "hat-a1-right",
    "label": "right",
-   "group": "Hat A1",
+   "group": "Mini-stick A1",
    "dir": "right",
    "dot": [
-    0.265,
-    0.083
+    0.158,
+    0.122
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it right.",
+   "moved": 5
+  },
+  {
+   "id": "hat-a1-down-right",
+   "label": "down-right",
+   "group": "Mini-stick A1",
+   "dir": "down-right",
+   "dot": [
+    0.158,
+    0.122
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it down and right.",
+   "added": 5,
+   "moved": 5
   },
   {
    "id": "hat-a1-down",
    "label": "down",
-   "group": "Hat A1",
+   "group": "Mini-stick A1",
    "dir": "down",
    "dot": [
-    0.265,
-    0.083
+    0.158,
+    0.122
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it down.",
+   "moved": 5
+  },
+  {
+   "id": "hat-a1-down-left",
+   "label": "down-left",
+   "group": "Mini-stick A1",
+   "dir": "down-left",
+   "dot": [
+    0.158,
+    0.122
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it down and left.",
+   "added": 5,
+   "moved": 5
   },
   {
    "id": "hat-a1-left",
    "label": "left",
-   "group": "Hat A1",
+   "group": "Mini-stick A1",
    "dir": "left",
    "dot": [
-    0.265,
-    0.083
+    0.158,
+    0.122
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it left.",
+   "moved": 5
+  },
+  {
+   "id": "hat-a1-up-left",
+   "label": "up-left",
+   "group": "Mini-stick A1",
+   "dir": "up-left",
+   "dot": [
+    0.158,
+    0.122
+   ],
+   "inputs": {},
+   "kind": "",
+   "how": "In 8-way hat mode, push it up and left.",
+   "added": 5,
+   "moved": 5
   },
   {
    "id": "hat-a1-push",
    "label": "push",
-   "group": "Hat A1",
+   "group": "Mini-stick A1",
    "dir": "push",
    "dot": [
-    0.265,
-    0.083
+    0.158,
+    0.122
    ],
-   "inputs": {}
+   "inputs": {},
+   "kind": "",
+   "how": "Put it in 8-way hat mode (press it in to switch from mouse), then push it straight in.",
+   "moved": 5
+  },
+  {
+   "id": "hat-a1-analog-x",
+   "label": "analog left-right",
+   "group": "Mini-stick A1",
+   "dir": "",
+   "dot": [
+    0.158,
+    0.122
+   ],
+   "inputs": {},
+   "kind": "axis",
+   "how": "Switch the mini-stick to analog mode (press it in until pushing it no longer clicks or moves the pointer), then push it all the way left, then all the way right.",
+   "added": 5,
+   "moved": 5
+  },
+  {
+   "id": "hat-a1-analog-y",
+   "label": "analog up-down",
+   "group": "Mini-stick A1",
+   "dir": "",
+   "dot": [
+    0.158,
+    0.122
+   ],
+   "inputs": {},
+   "kind": "axis",
+   "how": "Switch the mini-stick to analog mode (press it in until pushing it no longer clicks or moves the pointer), then push it all the way up, then all the way down.",
+   "added": 5,
+   "moved": 5
   },
   {
    "id": "hat-a4-up",
@@ -65,12 +170,13 @@
    "group": "Hat A4",
    "dir": "up",
    "dot": [
-    0.365,
-    0.056
+    0.342,
+    0.072
    ],
    "inputs": {
     "base": "b11"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a4-right",
@@ -78,12 +184,13 @@
    "group": "Hat A4",
    "dir": "right",
    "dot": [
-    0.365,
-    0.056
+    0.342,
+    0.072
    ],
    "inputs": {
     "base": "b12"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a4-down",
@@ -91,12 +198,13 @@
    "group": "Hat A4",
    "dir": "down",
    "dot": [
-    0.365,
-    0.056
+    0.342,
+    0.072
    ],
    "inputs": {
     "base": "b13"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a4-left",
@@ -104,12 +212,13 @@
    "group": "Hat A4",
    "dir": "left",
    "dot": [
-    0.365,
-    0.056
+    0.342,
+    0.072
    ],
    "inputs": {
     "base": "b14"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a4-push",
@@ -117,12 +226,13 @@
    "group": "Hat A4",
    "dir": "push",
    "dot": [
-    0.365,
-    0.056
+    0.342,
+    0.072
    ],
    "inputs": {
     "base": "b15"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a3-up",
@@ -130,12 +240,13 @@
    "group": "Hat A3",
    "dir": "up",
    "dot": [
-    0.336,
-    0.133
+    0.272,
+    0.16
    ],
    "inputs": {
     "base": "b6"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a3-right",
@@ -143,12 +254,13 @@
    "group": "Hat A3",
    "dir": "right",
    "dot": [
-    0.336,
-    0.133
+    0.272,
+    0.16
    ],
    "inputs": {
     "base": "b7"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a3-down",
@@ -156,12 +268,13 @@
    "group": "Hat A3",
    "dir": "down",
    "dot": [
-    0.336,
-    0.133
+    0.272,
+    0.16
    ],
    "inputs": {
     "base": "b8"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a3-left",
@@ -169,12 +282,13 @@
    "group": "Hat A3",
    "dir": "left",
    "dot": [
-    0.336,
-    0.133
+    0.272,
+    0.16
    ],
    "inputs": {
     "base": "b9"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "hat-a3-push",
@@ -182,86 +296,87 @@
    "group": "Hat A3",
    "dir": "push",
    "dot": [
-    0.336,
-    0.133
+    0.272,
+    0.16
    ],
    "inputs": {
     "base": "b10"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "thumb-hat-c1-up",
    "label": "up",
-   "group": "Thumb hat C1",
+   "group": "Thumb hat C4",
    "dir": "up",
    "dot": [
-    0.369,
-    0.336
+    0.291,
+    0.373
    ],
    "inputs": {
     "base": "b16"
    },
-   "moved": 4,
+   "moved": 5,
    "how": "The grey thumb knob."
   },
   {
    "id": "thumb-hat-c1-right",
    "label": "right",
-   "group": "Thumb hat C1",
+   "group": "Thumb hat C4",
    "dir": "right",
    "dot": [
-    0.369,
-    0.336
+    0.291,
+    0.373
    ],
    "inputs": {
     "base": "b17"
    },
-   "moved": 4,
+   "moved": 5,
    "how": "The grey thumb knob."
   },
   {
    "id": "thumb-hat-c1-down",
    "label": "down",
-   "group": "Thumb hat C1",
+   "group": "Thumb hat C4",
    "dir": "down",
    "dot": [
-    0.369,
-    0.336
+    0.291,
+    0.373
    ],
    "inputs": {
     "base": "b18"
    },
-   "moved": 4,
+   "moved": 5,
    "how": "The grey thumb knob."
   },
   {
    "id": "thumb-hat-c1-left",
    "label": "left",
-   "group": "Thumb hat C1",
+   "group": "Thumb hat C4",
    "dir": "left",
    "dot": [
-    0.369,
-    0.336
+    0.291,
+    0.373
    ],
    "inputs": {
     "base": "b19"
    },
-   "moved": 4,
+   "moved": 5,
    "how": "The grey thumb knob."
   },
   {
    "id": "thumb-hat-c1-push",
    "label": "push",
-   "group": "Thumb hat C1",
+   "group": "Thumb hat C4",
    "dir": "push",
    "dot": [
-    0.369,
-    0.336
+    0.291,
+    0.373
    ],
    "inputs": {
     "base": "b20"
    },
-   "moved": 4,
+   "moved": 5,
    "how": "The grey thumb knob."
   },
   {
@@ -270,12 +385,13 @@
    "group": "",
    "dir": "",
    "dot": [
-    0.265,
-    0.178
+    0.165,
+    0.217
    ],
    "inputs": {
     "base": "b3"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "main-trigger-stage1",
@@ -283,13 +399,14 @@
    "group": "Main trigger",
    "dir": "",
    "dot": [
-    0.255,
-    0.256
+    0.215,
+    0.27
    ],
    "inputs": {
     "base": "b1"
    },
-   "how": "Pull the trigger."
+   "how": "Pull the trigger.",
+   "moved": 5
   },
   {
    "id": "main-trigger-stage2",
@@ -297,13 +414,14 @@
    "group": "Main trigger",
    "dir": "",
    "dot": [
-    0.255,
-    0.256
+    0.215,
+    0.27
    ],
    "inputs": {
     "base": "b2"
    },
-   "how": "Pull the trigger all the way."
+   "how": "Pull the trigger all the way.",
+   "moved": 5
   },
   {
    "id": "rapid-trigger",
@@ -311,14 +429,15 @@
    "group": "Rapid trigger",
    "dir": "up",
    "dot": [
-    0.237,
-    0.291
+    0.225,
+    0.31
    ],
    "inputs": {
     "base": "b21"
    },
    "kind": "",
-   "how": "Rock the rapid trigger up and let go."
+   "how": "Rock the rapid trigger up and let go.",
+   "moved": 5
   },
   {
    "id": "rapid-trigger-down",
@@ -326,43 +445,45 @@
    "group": "Rapid trigger",
    "dir": "down",
    "dot": [
-    0.237,
-    0.291
+    0.225,
+    0.31
    ],
    "inputs": {
     "base": "b22"
    },
    "kind": "",
    "how": "Rock the rapid trigger down and let go.",
-   "added": 3
+   "added": 3,
+   "moved": 5
   },
   {
    "id": "side-button-b1",
-   "label": "Side button B1",
+   "label": "Side button",
    "group": "",
    "dir": "",
    "dot": [
-    0.215,
-    0.131
+    0.04,
+    0.155
    ],
    "inputs": {
     "base": "b4"
    },
-   "moved": 4,
-   "how": "It's on the outside of the head, above your index finger (hidden behind the head in the picture). Press it once."
+   "moved": 5,
+   "how": "The bump on the outside of the head, above your index finger. Press it once."
   },
   {
    "id": "pinky-d1",
-   "label": "Pinky D1",
+   "label": "Pinky lever",
    "group": "",
    "dir": "",
    "dot": [
-    0.608,
-    0.506
+    0.582,
+    0.471
    ],
    "inputs": {
     "base": "b5"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "base-f1",
@@ -370,12 +491,13 @@
    "group": "",
    "dir": "",
    "dot": [
-    0.68,
-    0.691
+    0.639,
+    0.688
    ],
    "inputs": {
     "base": "b27"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "base-f2",
@@ -383,12 +505,13 @@
    "group": "",
    "dir": "",
    "dot": [
-    0.608,
-    0.728
+    0.538,
+    0.734
    ],
    "inputs": {
     "base": "b28"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "base-f3",
@@ -396,12 +519,13 @@
    "group": "",
    "dir": "",
    "dot": [
-    0.751,
-    0.672
+    0.741,
+    0.654
    ],
    "inputs": {
     "base": "b29"
-   }
+   },
+   "moved": 5
   },
   {
    "id": "switch-sw1-up",
@@ -409,13 +533,14 @@
    "group": "Switch SW1",
    "dir": "up",
    "dot": [
-    0.687,
-    0.817
+    0.608,
+    0.825
    ],
    "inputs": {
     "base": "b25"
    },
-   "how": "Flip the switch up."
+   "how": "Flip the switch up.",
+   "moved": 5
   },
   {
    "id": "switch-sw1-down",
@@ -423,13 +548,14 @@
    "group": "Switch SW1",
    "dir": "down",
    "dot": [
-    0.687,
-    0.817
+    0.608,
+    0.825
    ],
    "inputs": {
     "base": "b26"
    },
-   "how": "Flip the switch down."
+   "how": "Flip the switch down.",
+   "moved": 5
   },
   {
    "id": "wheel-t1",
@@ -437,14 +563,15 @@
    "group": "",
    "dir": "",
    "dot": [
-    0.765,
-    0.783
+    0.703,
+    0.768
    ],
    "inputs": {
     "base": "a2"
    },
    "kind": "axis",
-   "how": "Roll the wheel from one end to the other."
+   "how": "Roll the wheel from one end to the other.",
+   "moved": 5
   },
   {
    "id": "encoder-en1-up",
@@ -452,13 +579,14 @@
    "group": "Encoder EN1",
    "dir": "up",
    "dot": [
-    0.837,
-    0.756
+    0.816,
+    0.722
    ],
    "inputs": {
     "base": "b23"
    },
-   "how": "Turn the encoder one click up."
+   "how": "Turn the encoder one click up.",
+   "moved": 5
   },
   {
    "id": "encoder-en1-down",
@@ -466,14 +594,15 @@
    "group": "Encoder EN1",
    "dir": "down",
    "dot": [
-    0.837,
-    0.756
+    0.816,
+    0.722
    ],
    "inputs": {
     "base": "b24"
    },
-   "how": "Turn the encoder one click down."
+   "how": "Turn the encoder one click down.",
+   "moved": 5
   }
  ],
- "starter_rev": 4
+ "starter_rev": 5
 }

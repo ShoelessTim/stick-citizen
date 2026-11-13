@@ -214,10 +214,15 @@ def load_template(device_name: str) -> Template:
         elif rev > t.starter_rev:            # controls added to the built-in profile since this map was made
             have = {c.id for c in t.controls}
             fresh = {c["id"]: c for c in st.get("controls", [])}
-            for c in t.controls:                 # controls we moved on the picture move in saved maps too
-                f = fresh.get(c.id)
-                if f and f.get("moved", 0) > t.starter_rev and f.get("dot"):
+            for c in t.controls:                 # controls we moved on the built-in photo move in saved maps too
+                f = fresh.get(c.id)          # (not when the user set their own photo: their dots belong to it)
+                if f and f.get("moved", 0) > t.starter_rev and f.get("dot") and not t.image:
                     c.dot = list(f["dot"])
+            for c in t.controls:                 # names and how-tos follow the built-in profile; learned inputs stay
+                f = fresh.get(c.id)
+                if f:
+                    c.group, c.label = f.get("group", c.group), f.get("label", c.label)
+                    c.kind, c.how = f.get("kind", c.kind), f.get("how", c.how)
             for c in st.get("controls", []):
                 if c.get("added", 1) > t.starter_rev and c.get("id") not in have:
                     t.controls.append(from_json({"controls": [c]}, device_name).controls[0])
