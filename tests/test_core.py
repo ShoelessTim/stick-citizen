@@ -165,7 +165,7 @@ def test_builtin_vkb_profile(tmp_path, monkeypatch):
     r = next(s for s in st["sticks"] if s["side"] == "R")
     assert r["has_image"] and api.get_image(r["slot"]).startswith("data:image/png")   # bundled photo
     groups = {c["group"] or c["label"] for c in r["controls"]}
-    assert {"Main trigger", "Hat A1", "Red button A2", "Pinky D1", "Base F1"} <= groups
+    assert {"Main trigger", "Mini-stick A1", "Red button A2", "Pinky D1", "Base F1"} <= groups
     trig = [c for c in r["controls"] if c["group"] == "Main trigger"]
     assert [c["inputs"].get("base") for c in trig] == ["b1", "b2"]                  # VKB default stages
     assert len(r["unassigned"]) > 20
@@ -306,8 +306,8 @@ def test_old_stick_maps_pick_up_new_builtin_controls(tmp_path, monkeypatch):
     assert "base-f1" not in ids                                                   # removals stay removed
     assert t.controls[0].inputs == {"base": "b20"}                                # learning kept
     assert "rapid-trigger-down" in ids                                          # new in rev 3
-    assert t.starter_rev == 3
-    assert templates.load_template(name).starter_rev == 3                         # saved, not re-added
+    assert t.starter_rev == 4
+    assert templates.load_template(name).starter_rev == 4                         # saved, not re-added
 
 
 def test_rapid_trigger_rocks_up_and_down(tmp_path, monkeypatch):
@@ -336,3 +336,29 @@ def test_axis_springing_back_doesnt_count_for_the_next_step(tmp_path, monkeypatc
     api.arm_capture(slot, "axis", "mini-stick-a2-analog-x")
     hub.axes = {"u1": [0, 0, 0, 0.95, 0.9, 0]}
     assert api.poll()["captured"]["key"] == "a3"
+
+
+def test_both_sticks_have_a_mini_stick_and_match(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    st = {s["side"]: s for s in api.get_state()["sticks"]}
+    for side, g in (("L", "Mini-stick A2"), ("R", "Mini-stick A1")):
+        mini = [c for c in st[side]["controls"] if c["group"] == g]
+        assert len([c for c in mini if c["dir"]]) == 9 and len([c for c in mini if c["kind"] == "axis"]) == 2
+    assert len(st["L"]["controls"]) == len(st["R"]["controls"])
+
+
+def test_old_right_map_becomes_mini_stick_keeping_learned_numbers(tmp_path, monkeypatch):
+    import json
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    name = "VKBsim Gladiator EVO R"
+    old = [dict(c, group="Hat A1") if c["id"].startswith("hat-a1-") else c
+           for c in templates.starter_for(name)["controls"] if c.get("added", 1) == 1]
+    for c in old:
+        if c["id"] == "hat-a1-up":
+            c["inputs"] = {"base": "b9"}
+    (tmp_path / f"{templates._slug(name)}.json").write_text(json.dumps({"name": name, "controls": old}), encoding="utf-8")
+    t = templates.load_template(name)
+    a1 = [c for c in t.controls if c.id.startswith("hat-a1-")]
+    assert {c.group for c in a1} == {"Mini-stick A1"} and len(a1) == 11
+    assert t.control("hat-a1-up").inputs == {"base": "b9"}
