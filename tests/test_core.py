@@ -168,7 +168,10 @@ def test_builtin_vkb_profile(tmp_path, monkeypatch):
     assert {"Main trigger", "Hat A1", "Red button A2", "Pinky D1", "Base F1"} <= groups
     trig = [c for c in r["controls"] if c["group"] == "Main trigger"]
     assert [c["inputs"].get("base") for c in trig] == ["b1", "b2"]                  # VKB default stages
-    assert len(r["unassigned"]) > 20
+    # VKB stock numbers are built in (read off Tim's sticks); only the mini-stick / A1 hat is left to learn
+    assert set(r["unassigned"]) == {"hat-a1-up", "hat-a1-right", "hat-a1-down", "hat-a1-left", "hat-a1-push"}
+    ids = {c["id"]: c["inputs"].get("base") for c in r["controls"]}
+    assert ids["red-button-a2"] == "b3" and ids["rapid-trigger-down"] == "b22" and ids["wheel-t1"] == "a2"
     cid = r["unassigned"][0]
     res = api.assign_input(r["slot"], cid, "base", "b30")
     r2 = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])

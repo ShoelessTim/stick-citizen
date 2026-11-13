@@ -2,7 +2,7 @@
  "name": "VKB Gladiator NXT EVO SCG R",
  "match": "gladiator.*\\br\\b",
  "image": "vkb-gladiator-nxt-evo-r.png",
- "note": "Built-in profile. Names follow VKB's SCG templates; trigger stages 1/2 are VKB defaults; other buttons are learned once with 'Set up'. Photos: VKB product images.",
+ "note": "Built-in profile. Names follow VKB's SCG templates; trigger stages 1/2 are VKB defaults; button numbers are VKB's stock profile as read off Tim's sticks with Set up (2026-11-12, v3.6.0); only controls left empty need Set up. Photos: VKB product images.",
  "controls": [
   {
    "id": "hat-a1-up",
@@ -68,7 +68,9 @@
     0.365,
     0.056
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b11"
+   }
   },
   {
    "id": "hat-a4-right",
@@ -79,7 +81,9 @@
     0.365,
     0.056
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b12"
+   }
   },
   {
    "id": "hat-a4-down",
@@ -90,7 +94,9 @@
     0.365,
     0.056
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b13"
+   }
   },
   {
    "id": "hat-a4-left",
@@ -101,7 +107,9 @@
     0.365,
     0.056
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b14"
+   }
   },
   {
    "id": "hat-a4-push",
@@ -112,7 +120,9 @@
     0.365,
     0.056
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b15"
+   }
   },
   {
    "id": "hat-a3-up",
@@ -123,7 +133,9 @@
     0.336,
     0.133
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b6"
+   }
   },
   {
    "id": "hat-a3-right",
@@ -134,7 +146,9 @@
     0.336,
     0.133
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b7"
+   }
   },
   {
    "id": "hat-a3-down",
@@ -145,7 +159,9 @@
     0.336,
     0.133
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b8"
+   }
   },
   {
    "id": "hat-a3-left",
@@ -156,7 +172,9 @@
     0.336,
     0.133
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b9"
+   }
   },
   {
    "id": "hat-a3-push",
@@ -167,7 +185,9 @@
     0.336,
     0.133
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b10"
+   }
   },
   {
    "id": "thumb-hat-c1-up",
@@ -178,7 +198,9 @@
     0.215,
     0.131
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b16"
+   }
   },
   {
    "id": "thumb-hat-c1-right",
@@ -189,7 +211,9 @@
     0.215,
     0.131
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b17"
+   }
   },
   {
    "id": "thumb-hat-c1-down",
@@ -200,7 +224,9 @@
     0.215,
     0.131
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b18"
+   }
   },
   {
    "id": "thumb-hat-c1-left",
@@ -211,7 +237,9 @@
     0.215,
     0.131
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b19"
+   }
   },
   {
    "id": "thumb-hat-c1-push",
@@ -222,7 +250,9 @@
     0.215,
     0.131
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b20"
+   }
   },
   {
    "id": "red-button-a2",
@@ -233,7 +263,9 @@
     0.265,
     0.178
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b3"
+   }
   },
   {
    "id": "main-trigger-stage1",
@@ -272,7 +304,9 @@
     0.237,
     0.291
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "b21"
+   },
    "kind": "",
    "how": "Rock the rapid trigger up and let go."
   },
@@ -285,7 +319,9 @@
     0.237,
     0.291
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "b22"
+   },
    "kind": "",
    "how": "Rock the rapid trigger down and let go.",
    "added": 3
@@ -299,7 +335,9 @@
     0.369,
     0.336
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b4"
+   }
   },
   {
    "id": "pinky-d1",
@@ -310,7 +348,9 @@
     0.608,
     0.506
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b5"
+   }
   },
   {
    "id": "base-f1",
@@ -321,7 +361,9 @@
     0.68,
     0.691
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b27"
+   }
   },
   {
    "id": "base-f2",
@@ -332,7 +374,9 @@
     0.608,
     0.728
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b28"
+   }
   },
   {
    "id": "base-f3",
@@ -343,7 +387,9 @@
     0.751,
     0.672
    ],
-   "inputs": {}
+   "inputs": {
+    "base": "b29"
+   }
   },
   {
    "id": "switch-sw1-up",
@@ -354,7 +400,9 @@
     0.687,
     0.817
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "b25"
+   },
    "how": "Flip the switch up."
   },
   {
@@ -366,7 +414,9 @@
     0.687,
     0.817
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "b26"
+   },
    "how": "Flip the switch down."
   },
   {
@@ -378,7 +428,9 @@
     0.765,
     0.783
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "a2"
+   },
    "kind": "axis",
    "how": "Roll the wheel from one end to the other."
   },
@@ -391,7 +443,9 @@
     0.837,
     0.756
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "b23"
+   },
    "how": "Turn the encoder one click up."
   },
   {
@@ -403,7 +457,9 @@
     0.837,
     0.756
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "b24"
+   },
    "how": "Turn the encoder one click down."
   }
  ],

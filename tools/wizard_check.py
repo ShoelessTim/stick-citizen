@@ -39,11 +39,12 @@ srv = ThreadingHTTPServer(("127.0.0.1", 0), H); threading.Thread(target=srv.serv
 url = f"http://127.0.0.1:{srv.server_port}/index.html"
 
 # ---- the simulated hardware: every control gets its own number; axes by index
+PRESSED = set()
 AXES = {"wheel-t1": 6, "mini-stick-a2-analog-x": 3, "mini-stick-a2-analog-y": 4}
 NUM = {}
 def key_for(side, cid):
     k = (side, cid)
-    if k not in NUM: NUM[k] = f"b{20 + len([x for x in NUM if x[0] == side])}"
+    if k not in NUM: NUM[k] = f"b{60 + len([x for x in NUM if x[0] == side])}"   # clear of the built-in VKB numbers
     return NUM[k]
 
 def press(uid, keys, hold=0.12):
@@ -105,7 +106,7 @@ with sync_playwright() as p:
                 time.sleep(0.05)
             else: log.append(f"   !! never armed for {want}"); return
             if kind == "axis":
-                i = AXES.get(cid, 5)
+                i = AXES.get(cid, 5); PRESSED.add((side, cid))
                 with lock: hub.axes[uid][i] = 0.95
                 pg.wait_for_timeout(400)
                 with lock: hub.axes[uid][i] = 0.0
@@ -129,7 +130,7 @@ with sync_playwright() as p:
             if k: dupes.setdefault(k, []).append(cid)
         log.append(f"== {s['side']}: {sum(1 for v in inputs.values() if v)} learned, {len(s['unassigned'])} unassigned {s['unassigned']}, "
                    f"shared inputs: {[v for v in dupes.values() if len(v) > 1]}")
-        wrong = [cid for cid, k in inputs.items() if k and cid in AXES and k != f"a{AXES[cid]}"]
+        wrong = [cid for cid, k in inputs.items() if k and (s['side'], cid) in PRESSED and k != f"a{AXES[cid]}"]
         wrong += [cid for cid, k in inputs.items() if k and (s['side'], cid) in NUM and k != NUM[(s['side'], cid)]]
         log.append(f"   wrong numbers: {wrong}")
     # Sublight lands?
