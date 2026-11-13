@@ -40,7 +40,7 @@ url = f"http://127.0.0.1:{srv.server_port}/index.html"
 
 # ---- the simulated hardware: every control gets its own number; axes by index
 PRESSED = set()
-AXES = {"wheel-t1": 6, "mini-stick-a2-analog-x": 3, "mini-stick-a2-analog-y": 4}
+AXES = {"wheel-t1": 6, "mini-stick-a2-analog-x": 3, "mini-stick-a2-analog-y": 4, "hat-a1-analog-x": 3, "hat-a1-analog-y": 4}
 NUM = {}
 def key_for(side, cid):
     k = (side, cid)

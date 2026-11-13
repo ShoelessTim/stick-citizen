@@ -165,11 +165,11 @@ def test_builtin_vkb_profile(tmp_path, monkeypatch):
     r = next(s for s in st["sticks"] if s["side"] == "R")
     assert r["has_image"] and api.get_image(r["slot"]).startswith("data:image/png")   # bundled photo
     groups = {c["group"] or c["label"] for c in r["controls"]}
-    assert {"Main trigger", "Hat A1", "Red button A2", "Pinky D1", "Base F1"} <= groups
+    assert {"Main trigger", "Mini-stick A1", "Red button A2", "Pinky lever", "Base F1"} <= groups
     trig = [c for c in r["controls"] if c["group"] == "Main trigger"]
     assert [c["inputs"].get("base") for c in trig] == ["b1", "b2"]                  # VKB default stages
     # VKB stock numbers are built in (read off Tim's sticks); only the mini-stick / A1 hat is left to learn
-    assert set(r["unassigned"]) == {"hat-a1-up", "hat-a1-right", "hat-a1-down", "hat-a1-left", "hat-a1-push"}
+    assert set(r["unassigned"]) == {c["id"] for c in r["controls"] if c["group"] == "Mini-stick A1"} and len(r["unassigned"]) == 11
     ids = {c["id"]: c["inputs"].get("base") for c in r["controls"]}
     assert ids["red-button-a2"] == "b3" and ids["rapid-trigger-down"] == "b22" and ids["wheel-t1"] == "a2"
     cid = r["unassigned"][0]
@@ -209,7 +209,7 @@ def test_setup_learns_multi_button_controls(tmp_path, monkeypatch):
     assert got["keys"] == ["b4", "b5"]
     res = api.learn(r["slot"], "side-button-b1", got["keys"])
     st = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])
-    stages = [c for c in st["controls"] if c["group"] == "Side button B1"]
+    stages = [c for c in st["controls"] if c["group"] == "Side button"]
     assert [c["inputs"]["base"] for c in stages] == ["b4", "b5"] and [c["label"] for c in stages] == ["stage 1", "stage 2"]
     # a hat direction only ever takes the first input (diagonals fire two)
     api.learn(r["slot"], "hat-a4-up", ["h1u", "h1r"])
@@ -276,7 +276,7 @@ def test_fresh_start_backs_up_old_maps_once(tmp_path, monkeypatch):
 def test_mini_stick_analog_mode_learns_two_axes(tmp_path, monkeypatch):
     api, hub = _api(tmp_path, monkeypatch)
     left = next(s for s in api.get_state()["sticks"] if s["side"] == "L")
-    mini = [c for c in left["controls"] if c["group"] == "Mini-stick A2"]
+    mini = [c for c in left["controls"] if c["group"] == "Mini-stick A1"]
     analog = [c for c in mini if c["kind"] == "axis"]
     assert [c["id"] for c in analog] == ["mini-stick-a2-analog-x", "mini-stick-a2-analog-y"]
     assert len([c for c in mini if c["dir"]]) == 9                       # hat mode: 8 directions + push
@@ -289,7 +289,7 @@ def test_mini_stick_analog_mode_learns_two_axes(tmp_path, monkeypatch):
         assert cap["key"] == f"a{idx}"
         res = api.learn(slot, cid, cap["keys"])
     l2 = next(s for s in res["state"]["sticks"] if s["slot"] == slot)
-    got = {c["id"]: c["inputs"].get("base") for c in l2["controls"] if c["kind"] == "axis" and c["group"] == "Mini-stick A2"}
+    got = {c["id"]: c["inputs"].get("base") for c in l2["controls"] if c["kind"] == "axis" and c["group"] == "Mini-stick A1"}
     assert got == {"mini-stick-a2-analog-x": "a3", "mini-stick-a2-analog-y": "a4"}
 
 
@@ -309,8 +309,8 @@ def test_old_stick_maps_pick_up_new_builtin_controls(tmp_path, monkeypatch):
     assert "base-f1" not in ids                                                   # removals stay removed
     assert t.controls[0].inputs == {"base": "b20"}                                # learning kept
     assert "rapid-trigger-down" in ids                                          # new in rev 3
-    assert t.starter_rev == 4
-    assert templates.load_template(name).starter_rev == 4                         # saved, not re-added
+    assert t.starter_rev == 5
+    assert templates.load_template(name).starter_rev == 5                         # saved, not re-added
 
 
 def test_rapid_trigger_rocks_up_and_down(tmp_path, monkeypatch):
@@ -358,4 +358,46 @@ def test_side_button_and_thumb_hat_dots_follow_the_fix(tmp_path, monkeypatch):
         t = templates.load_template(name)
         assert t.control("side-button-b1").dot == sb["dot"] and t.control("side-button-b1").inputs == {"base": "b4"}
         assert t.control("thumb-hat-c1-up").dot == c1["dot"]
-        assert t.control("hat-a4-up").dot == [0.5, 0.5]                          # untouched controls keep the user's dot
+        a4 = next(c for c in st["controls"] if c["id"] == "hat-a4-up")
+        assert t.control("hat-a4-up").dot == a4["dot"]                           # v3.7.0 new photos: every dot follows
+
+
+def test_own_photo_keeps_its_dots(tmp_path, monkeypatch):
+    """A user who set their own stick photo keeps their dots when the built-in photo changes."""
+    import json
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    name = "VKBsim Gladiator EVO L"
+    st = templates.starter_for(name)
+    old = [dict(c, dot=[0.5, 0.5]) for c in st["controls"] if c.get("added", 1) == 1]
+    (tmp_path / f"{templates._slug(name)}.json").write_text(
+        json.dumps({"name": name, "image": "mine.png", "starter_rev": 4, "controls": old}), encoding="utf-8")
+    t = templates.load_template(name)
+    assert t.control("hat-a4-up").dot == [0.5, 0.5]
+    assert t.control("pinky-d1").label == "Pinky lever"                         # names still follow the profile
+
+
+def test_both_sticks_have_a_mini_stick_and_match(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    st = {s["side"]: s for s in api.get_state()["sticks"]}
+    for side, g in (("L", "Mini-stick A1"), ("R", "Mini-stick A1")):
+        mini = [c for c in st[side]["controls"] if c["group"] == g]
+        assert len([c for c in mini if c["dir"]]) == 9 and len([c for c in mini if c["kind"] == "axis"]) == 2
+    assert len(st["L"]["controls"]) == len(st["R"]["controls"])
+
+
+def test_old_right_map_becomes_mini_stick_keeping_learned_numbers(tmp_path, monkeypatch):
+    import json
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    name = "VKBsim Gladiator EVO R"
+    old = [dict(c, group="Hat A1") if c["id"].startswith("hat-a1-") else c
+           for c in templates.starter_for(name)["controls"] if c.get("added", 1) == 1]
+    for c in old:
+        if c["id"] == "hat-a1-up":
+            c["inputs"] = {"base": "b9"}
+    (tmp_path / f"{templates._slug(name)}.json").write_text(json.dumps({"name": name, "controls": old}), encoding="utf-8")
+    t = templates.load_template(name)
+    a1 = [c for c in t.controls if c.id.startswith("hat-a1-")]
+    assert {c.group for c in a1} == {"Mini-stick A1"} and len(a1) == 11
+    assert t.control("hat-a1-up").inputs == {"base": "b9"}
