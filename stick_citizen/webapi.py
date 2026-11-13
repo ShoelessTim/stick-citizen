@@ -17,11 +17,11 @@ import time
 from pathlib import Path
 
 from . import __version__, config as configmod
-from .actionmaps import find_actionmaps, load_profile
+from .actionmaps import INVERT_OPTION, find_actionmaps, load_profile
 from .bindings import ACTIVATION_MODES, BindingSet, Bound, load_catalog, mappings_dir
 from .callouts import spoken
 from .paths import backup_dir, fresh_start, migrate_legacy, user_dir
-from .templates import bind_key, key_of, load_template, other_inputs, parse_key, short_label
+from .templates import CARDINALS, POV_KEY, bind_key, fix_pov_hats, key_of, load_template, other_inputs, parse_key, short_label
 
 MODES = [("all", "All"), ("flight", "Flight"), ("mining", "Mining"), ("salvage", "Salvage"),
          ("turret", "Turret"), ("foot", "On foot"), ("ground", "Ground")]
@@ -483,6 +483,15 @@ class Api:
         if not c or not keys:
             return {"ok": False, "msg": "Nothing to learn"}
         keys = list(dict.fromkeys(keys))
+        pov = next((k for k in keys if POV_KEY.match(k)), None) if c.dir and c.group else None
+        if pov:                                                  # a POV hat names its own four directions
+            n = POV_KEY.match(pov).group(1)
+            for x in t.controls:
+                if x.group == c.group and x.dir in CARDINALS:
+                    x.inputs["base"] = f"h{n}{CARDINALS[x.dir]}"
+            fix_pov_hats(t)
+            t.save()
+            return self._ok(f"{c.group} is a POV hat: all four directions learned", pov=True)
         if c.dir or c.kind == "axis" or len(keys) == 1:          # hat directions and axes take one input
             t.set_layer(c, "base", keys[0])
             t.save()
@@ -634,6 +643,7 @@ class Api:
         """Start from a built-in layout. Bindings land on your learned controls; undo brings the old ones back."""
         self._bset._snapshot()
         self._bset.binds = {}
+        self._bset.inverts = set()
         if layout_id == "blank":
             self._bset.name = "MyHOSAS"
             return self._ok("Blank layout. Click any label to bind.")
@@ -661,6 +671,8 @@ class Api:
                         waiting += 1
             for slot_axis, v in d.get("axes", {}).get(side, {}).items():
                 self._bset.binds.setdefault((s["slot"], "axis", int(slot_axis), ""), []).append(Bound(v[0], v[1], ""))
+                if "invert" in v[2:] and v[1] in INVERT_OPTION:     # e.g. ["spaceship_movement", "v_yaw", "invert"]
+                    self._bset.inverts.add((s["slot"], INVERT_OPTION[v[1]]))
                 done += 1
         msg = f"{self._bset.name}: {done} bindings placed"
         if waiting:

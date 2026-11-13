@@ -90,6 +90,13 @@ with sync_playwright() as p:
                 a, c = info["dir"].split("-")
                 g = info["group"].lower().replace(" ", "-")
                 press(uid, [key_for(side, f"{g}-{a}"), key_for(side, f"{g}-{c}")]); pg.wait_for_timeout(400); continue
+            if scenario == "pov" and info["group"].startswith("Mini-stick") and info["dir"] and info["dir"] != "push":
+                for _ in range(50):
+                    if armed("button"): break
+                    time.sleep(0.05)
+                LET = {"up": "u", "right": "r", "down": "d", "left": "l"}
+                press(uid, [f"h1{LET[d]}" for d in info["dir"].split("-")]); pg.wait_for_timeout(500)
+                log.append("   pov note: " + (pg.evaluate("(document.querySelector('#wizard .wz-note')||{}).textContent") or "")); continue
             if scenario == "pairs" and kind == "axis" and "analog" in cid:
                 pg.click("#wizard .wz-btns .btn:has-text('No analog mode')"); pg.wait_for_timeout(400); continue
             if scenario == "happy" and cid == "hat-a3-down" and "dup" not in did:     # press the wrong one once
@@ -133,6 +140,12 @@ with sync_playwright() as p:
         wrong = [cid for cid, k in inputs.items() if k and (s['side'], cid) in PRESSED and k != f"a{AXES[cid]}"]
         wrong += [cid for cid, k in inputs.items() if k and (s['side'], cid) in NUM and k != NUM[(s['side'], cid)]]
         log.append(f"   wrong numbers: {wrong}")
+    if os.environ.get("SCEN") == "pov":
+        l = next(s for s in st["sticks"] if s["side"] == "L")
+        mini = {c["dir"]: c["inputs"].get("base") for c in l["controls"] if c["group"] == "Mini-stick A1" and c["dir"]}
+        log.append(f"== L mini-stick (POV): {mini}")
+        if {k: v for k, v in mini.items() if k != "push"} != {"up": "h1u", "right": "h1r", "down": "h1d", "left": "h1l"}:
+            ERR.append("POV mini-stick not learned as four directions")
     # Sublight lands?
     with lock: r = api.apply_layout("sublight")
     log.append("== Sublight: " + str(r.get("msg")))

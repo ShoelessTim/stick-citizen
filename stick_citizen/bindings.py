@@ -86,6 +86,7 @@ class BindingSet:
         self.name = name
         self.devices: dict[int, str] = {}       # SC js instance -> product string
         self.binds: dict[tuple, list] = {}      # Input.key -> [Bound]
+        self.inverts: set = set()               # {(js instance, SC option name)}, e.g. (2, "flight_move_yaw")
         self._undo: list = []
         self.dirty = False
 
@@ -94,6 +95,7 @@ class BindingSet:
     def from_profile(cls, prof: Profile) -> "BindingSet":
         bs = cls(prof.name or "Stick Citizen")
         bs.devices = dict(prof.devices)
+        bs.inverts = set(getattr(prof, "inverts", set()))
         for b in prof.bindings:
             bs.binds.setdefault(b.input.key, []).append(Bound(b.actionmap, b.action, b.activation, b.modifiers))
         return bs
@@ -159,7 +161,7 @@ class BindingSet:
     # ----- export -----
     def to_xml(self, profile_name: str | None = None) -> str:
         name = re.sub(r"[^A-Za-z0-9_-]+", "-", profile_name or self.name).strip("-") or "StickCitizen"
-        instances = sorted(set(self.devices) | {k[0] for k in self.binds})
+        instances = sorted(set(self.devices) | {k[0] for k in self.binds} | {i for i, _ in self.inverts})
         by_map: dict[str, dict[str, list]] = {}
         for key, lst in self.binds.items():
             inp = Input(*key)
@@ -172,7 +174,14 @@ class BindingSet:
         out += ["  </devices>", " </CustomisationUIHeader>"]
         for i in instances:
             prod = self.devices.get(i, "")
-            out.append(f' <options type="joystick" instance="{i}"' + (f" Product={quoteattr(prod)}" if prod else "") + "/>")
+            head = f' <options type="joystick" instance="{i}"' + (f" Product={quoteattr(prod)}" if prod else "")
+            inv = sorted(o for inst, o in self.inverts if inst == i)
+            if inv:
+                out.append(head + ">")
+                out += [f"  <{o} invert=\"1\"/>" for o in inv]
+                out.append(" </options>")
+            else:
+                out.append(head + "/>")
         for mapname in sorted(by_map):
             out.append(f" <actionmap name={quoteattr(mapname)}>")
             for action in sorted(by_map[mapname]):

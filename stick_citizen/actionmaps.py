@@ -41,6 +41,14 @@ class Binding:
     activation: str = ""
 
 
+# SC keeps axis inversion per joystick in <options type="joystick" instance="N"><flight_move_yaw invert="1"/></options>
+INVERT_OPTION = {
+    "v_pitch": "flight_move_pitch", "v_yaw": "flight_move_yaw", "v_roll": "flight_move_roll",
+    "v_strafe_lateral": "flight_move_strafe_lateral", "v_strafe_vertical": "flight_move_strafe_vertical",
+    "v_strafe_longitudinal": "flight_move_strafe_longitudinal",
+}
+
+
 @dataclass
 class Profile:
     path: str | None
@@ -48,6 +56,7 @@ class Profile:
     devices: dict            # instance -> product string from the file
     bindings: list
     by_input: dict = field(default_factory=dict)
+    inverts: set = field(default_factory=set)   # {(instance, option name)}, e.g. (2, "flight_move_yaw")
 
     def __post_init__(self):
         for b in self.bindings:
@@ -95,7 +104,7 @@ def parse_actionmaps(text: str, path: str | None = None) -> Profile:
         scope = next((p for p in profiles if p.get("profileName") == "default"), profiles[0])
         name = scope.get("profileName") or name
 
-    devices = {}
+    devices, inverts = {}, set()
     for opt in scope.iter("options"):
         if (opt.get("type") or "").lower() != "joystick":
             continue
@@ -105,6 +114,9 @@ def parse_actionmaps(text: str, path: str | None = None) -> Profile:
             continue
         if inst and inst not in devices:
             devices[inst] = (opt.get("Product") or opt.get("product") or "").strip()
+        for o in opt:
+            if inst and o.get("invert") == "1":
+                inverts.add((inst, o.tag))
 
     bindings = []
     for am in scope.iter("actionmap"):
@@ -120,7 +132,7 @@ def parse_actionmaps(text: str, path: str | None = None) -> Profile:
 
     if not name and path:
         name = Path(path).stem
-    return Profile(path, name, devices, bindings)
+    return Profile(path, name, devices, bindings, inverts=inverts)
 
 
 def load_profile(path) -> Profile:

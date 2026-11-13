@@ -2,7 +2,7 @@
  "name": "VKB Gladiator NXT EVO Premium R",
  "match": "gladiator.*\\br\\b",
  "image": "vkb-gladiator-nxt-evo-r.png",
- "note": "Built-in profile for the Premium grip. Names are the labels printed on the stick (A1-A4) and Tim's names for the unlabeled ones (Thumb hat C4, Side button, Pinky lever). Button numbers are VKB's stock profile as read off Tim's sticks with Set up (2026-11-12); only the mini-stick needs Set up. Both sticks: A1 is the 8-way / mouse / analog mini-stick (left-stick ids stay mini-stick-a2-*, right-stick ids hat-a1-*, so layouts keep working). Photos: Tim's own (ShoelessTim), 2026-11-12.",
+ "note": "Built-in profile for the Premium grip. Names are the labels printed on the stick (A1-A4) and Tim's names for the unlabeled ones (Thumb hat C4, Side button, Pinky lever). Button numbers are VKB's stock profile as read off Tim's sticks with Set up (2026-11-12); only the mini-stick needs Set up. Both sticks: A1 is the 8-way / mouse / analog mini-stick (left-stick ids stay mini-stick-a2-*, right-stick ids hat-a1-*, so layouts keep working). Photos: Tim's own (ShoelessTim), 2026-11-12. Right mini-stick on VKB's stock profile (read off Tim's stick, v3.7.0): hat mode is POV hat 1 (no separate diagonals), analog mode is a4 (left-right) / a3 (up-down).",
  "controls": [
   {
    "id": "hat-a1-up",
@@ -13,24 +13,11 @@
     0.158,
     0.122
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "h1u"
+   },
    "kind": "",
    "how": "In 8-way hat mode, push it up.",
-   "moved": 5
-  },
-  {
-   "id": "hat-a1-up-right",
-   "label": "up-right",
-   "group": "Mini-stick A1",
-   "dir": "up-right",
-   "dot": [
-    0.158,
-    0.122
-   ],
-   "inputs": {},
-   "kind": "",
-   "how": "In 8-way hat mode, push it up and right.",
-   "added": 5,
    "moved": 5
   },
   {
@@ -42,24 +29,11 @@
     0.158,
     0.122
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "h1r"
+   },
    "kind": "",
    "how": "In 8-way hat mode, push it right.",
-   "moved": 5
-  },
-  {
-   "id": "hat-a1-down-right",
-   "label": "down-right",
-   "group": "Mini-stick A1",
-   "dir": "down-right",
-   "dot": [
-    0.158,
-    0.122
-   ],
-   "inputs": {},
-   "kind": "",
-   "how": "In 8-way hat mode, push it down and right.",
-   "added": 5,
    "moved": 5
   },
   {
@@ -71,24 +45,11 @@
     0.158,
     0.122
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "h1d"
+   },
    "kind": "",
    "how": "In 8-way hat mode, push it down.",
-   "moved": 5
-  },
-  {
-   "id": "hat-a1-down-left",
-   "label": "down-left",
-   "group": "Mini-stick A1",
-   "dir": "down-left",
-   "dot": [
-    0.158,
-    0.122
-   ],
-   "inputs": {},
-   "kind": "",
-   "how": "In 8-way hat mode, push it down and left.",
-   "added": 5,
    "moved": 5
   },
   {
@@ -100,24 +61,11 @@
     0.158,
     0.122
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "h1l"
+   },
    "kind": "",
    "how": "In 8-way hat mode, push it left.",
-   "moved": 5
-  },
-  {
-   "id": "hat-a1-up-left",
-   "label": "up-left",
-   "group": "Mini-stick A1",
-   "dir": "up-left",
-   "dot": [
-    0.158,
-    0.122
-   ],
-   "inputs": {},
-   "kind": "",
-   "how": "In 8-way hat mode, push it up and left.",
-   "added": 5,
    "moved": 5
   },
   {
@@ -143,7 +91,9 @@
     0.158,
     0.122
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "a4"
+   },
    "kind": "axis",
    "how": "Switch the mini-stick to analog mode (press it in until pushing it no longer clicks or moves the pointer), then push it all the way left, then all the way right.",
    "added": 5,
@@ -158,7 +108,9 @@
     0.158,
     0.122
    ],
-   "inputs": {},
+   "inputs": {
+    "base": "a3"
+   },
    "kind": "axis",
    "how": "Switch the mini-stick to analog mode (press it in until pushing it no longer clicks or moves the pointer), then push it all the way up, then all the way down.",
    "added": 5,
@@ -604,5 +556,5 @@
    "moved": 5
   }
  ],
- "starter_rev": 5
+ "starter_rev": 6
 }

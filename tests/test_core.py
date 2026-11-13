@@ -169,7 +169,7 @@ def test_builtin_vkb_profile(tmp_path, monkeypatch):
     trig = [c for c in r["controls"] if c["group"] == "Main trigger"]
     assert [c["inputs"].get("base") for c in trig] == ["b1", "b2"]                  # VKB default stages
     # VKB stock numbers are built in (read off Tim's sticks); only the mini-stick / A1 hat is left to learn
-    assert set(r["unassigned"]) == {c["id"] for c in r["controls"] if c["group"] == "Mini-stick A1"} and len(r["unassigned"]) == 11
+    assert r["unassigned"] == ["hat-a1-push"]                                         # right mini-stick: POV + analog built in
     ids = {c["id"]: c["inputs"].get("base") for c in r["controls"]}
     assert ids["red-button-a2"] == "b3" and ids["rapid-trigger-down"] == "b22" and ids["wheel-t1"] == "a2"
     cid = r["unassigned"][0]
@@ -211,10 +211,10 @@ def test_setup_learns_multi_button_controls(tmp_path, monkeypatch):
     st = next(s for s in res["state"]["sticks"] if s["slot"] == r["slot"])
     stages = [c for c in st["controls"] if c["group"] == "Side button"]
     assert [c["inputs"]["base"] for c in stages] == ["b4", "b5"] and [c["label"] for c in stages] == ["stage 1", "stage 2"]
-    # a hat direction only ever takes the first input (diagonals fire two)
-    api.learn(r["slot"], "hat-a4-up", ["h1u", "h1r"])
+    # a hat direction that sends a POV hat learns the whole hat (diagonals fire two directions)
+    api.learn(r["slot"], "hat-a4-up", ["h2u", "h2r"])
     st = next(s for s in api.get_state()["sticks"] if s["slot"] == r["slot"])
-    assert next(c for c in st["controls"] if c["id"] == "hat-a4-up")["inputs"] == {"base": "h1u"}
+    assert next(c for c in st["controls"] if c["id"] == "hat-a4-right")["inputs"] == {"base": "h2r"}
 
 
 def test_sublight_layout(tmp_path, monkeypatch):
@@ -309,8 +309,8 @@ def test_old_stick_maps_pick_up_new_builtin_controls(tmp_path, monkeypatch):
     assert "base-f1" not in ids                                                   # removals stay removed
     assert t.controls[0].inputs == {"base": "b20"}                                # learning kept
     assert "rapid-trigger-down" in ids                                          # new in rev 3
-    assert t.starter_rev == 5
-    assert templates.load_template(name).starter_rev == 5                         # saved, not re-added
+    assert t.starter_rev == 6
+    assert templates.load_template(name).starter_rev == 6                         # saved, not re-added
 
 
 def test_rapid_trigger_rocks_up_and_down(tmp_path, monkeypatch):
@@ -380,10 +380,9 @@ def test_own_photo_keeps_its_dots(tmp_path, monkeypatch):
 def test_both_sticks_have_a_mini_stick_and_match(tmp_path, monkeypatch):
     api, hub = _api(tmp_path, monkeypatch)
     st = {s["side"]: s for s in api.get_state()["sticks"]}
-    for side, g in (("L", "Mini-stick A1"), ("R", "Mini-stick A1")):
-        mini = [c for c in st[side]["controls"] if c["group"] == g]
-        assert len([c for c in mini if c["dir"]]) == 9 and len([c for c in mini if c["kind"] == "axis"]) == 2
-    assert len(st["L"]["controls"]) == len(st["R"]["controls"])
+    for side, dirs in (("L", 9), ("R", 5)):          # right is a POV hat on stock VKB: 4 directions + push
+        mini = [c for c in st[side]["controls"] if c["group"] == "Mini-stick A1"]
+        assert len([c for c in mini if c["dir"]]) == dirs and len([c for c in mini if c["kind"] == "axis"]) == 2
 
 
 def test_old_right_map_becomes_mini_stick_keeping_learned_numbers(tmp_path, monkeypatch):
@@ -399,5 +398,55 @@ def test_old_right_map_becomes_mini_stick_keeping_learned_numbers(tmp_path, monk
     (tmp_path / f"{templates._slug(name)}.json").write_text(json.dumps({"name": name, "controls": old}), encoding="utf-8")
     t = templates.load_template(name)
     a1 = [c for c in t.controls if c.id.startswith("hat-a1-")]
-    assert {c.group for c in a1} == {"Mini-stick A1"} and len(a1) == 11
+    assert {c.group for c in a1} == {"Mini-stick A1"} and len(a1) == 7              # 4 dirs + push + 2 axes
     assert t.control("hat-a1-up").inputs == {"base": "b9"}
+
+
+def test_pov_mini_stick_map_from_v370_is_repaired(tmp_path, monkeypatch):
+    """Tim's v3.7.0 run: the right mini-stick is a POV hat; Set up stored one POV direction per diagonal and left
+    the four directions empty. Loading the map fills the four directions and drops the diagonals."""
+    import json
+    from stick_citizen import templates
+    monkeypatch.setattr(templates, "templates_dir", lambda: tmp_path)
+    name = "VKBsim Gladiator EVO R"
+    ctrls = [dict(c) for c in templates.starter_for(name)["controls"]]
+    for c in ctrls:
+        if c["id"].startswith("hat-a1-"):
+            c["inputs"] = {}
+    ctrls += [{"id": f"hat-a1-{d}", "label": d, "group": "Mini-stick A1", "dir": d, "dot": [0.1, 0.1], "inputs": {"base": k}}
+              for d, k in (("up-right", "h1r"), ("down-right", "h1d"), ("down-left", "h1l"), ("up-left", "h1u"))]
+    (tmp_path / f"{templates._slug(name)}.json").write_text(json.dumps({"name": name, "starter_rev": 6, "controls": ctrls}), encoding="utf-8")
+    t = templates.load_template(name)
+    a1 = {c.dir: c.inputs.get("base") for c in t.controls if c.group == "Mini-stick A1" and c.dir}
+    assert a1 == {"up": "h1u", "right": "h1r", "down": "h1d", "left": "h1l", "push": None}
+
+
+def test_setup_learns_a_pov_hat_in_one_press(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    l = next(s for s in api.get_state()["sticks"] if s["side"] == "L")
+    res = api.learn(l["slot"], "mini-stick-a2-up", ["h1u"])
+    assert res["pov"]
+    mini = {c["dir"]: c["inputs"].get("base") for c in next(s for s in res["state"]["sticks"] if s["side"] == "L")["controls"]
+            if c["group"] == "Mini-stick A1" and c["dir"]}
+    assert mini == {"up": "h1u", "right": "h1r", "down": "h1d", "left": "h1l", "push": None}   # no diagonals left
+
+
+def test_builtin_right_mini_stick_is_pov(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    r = next(s for s in api.get_state()["sticks"] if s["side"] == "R")
+    ids = {c["id"]: c["inputs"].get("base") for c in r["controls"]}
+    assert ids["hat-a1-up"] == "h1u" and ids["hat-a1-analog-x"] == "a4" and "hat-a1-up-right" not in ids
+    assert r["unassigned"] == ["hat-a1-push"]
+
+
+def test_sublight_yaw_is_inverted_in_the_export(tmp_path, monkeypatch):
+    """Tim 2026-11-12: Sublight's yaw went the wrong way. SC keeps inversion as a joystick option."""
+    from stick_citizen.actionmaps import parse_actionmaps
+    api, hub = _api(tmp_path, monkeypatch)
+    r = next(s for s in api.get_state()["sticks"] if s["side"] == "R")
+    api.apply_layout("sublight")
+    xml = api._bset.to_xml("T")
+    assert f'<options type="joystick" instance="{r["slot"]}"' in xml and '<flight_move_yaw invert="1"/>' in xml
+    assert parse_actionmaps(xml).inverts == {(r["slot"], "flight_move_yaw")}             # round-trips
+    api.apply_layout("blank")
+    assert "invert" not in api._bset.to_xml("T")

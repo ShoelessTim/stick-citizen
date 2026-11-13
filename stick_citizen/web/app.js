@@ -576,9 +576,13 @@ async function setupFlow(stick) {
     }
     const res = await API.learn(slot, m.id, g.hat && m.dir ? [key] : keys);
     if (res.state) S.state = res.state;
+    if (res.pov) {                               // a POV hat: its four directions came in at once, no diagonals
+      for (const x of g.members) if (x.dir && x.dir !== "push") W.gone.add(x.id);
+      W.note = { kind: "ok", text: res.msg };
+    }
     W.learned++;
     W.last = { id: m.id, keys: g.hat && m.dir ? [key] : keys };
-    W.note = null;
+    if (!res.pov) W.note = null;
     W.i++;
   }
   window.removeEventListener("mousemove", onMouse);
