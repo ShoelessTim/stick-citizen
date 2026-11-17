@@ -97,7 +97,7 @@ def snapshot(live, saved=False, keep=KEEP, now=None) -> dict:
         return {"ok": False, "created": False, "backup": None, "msg": "Star Citizen's bindings file looks half-written. Try again in a moment."}
     d = backups_dir()
     h = _digest(data)
-    for _ts, _n, f, m in _entries(d):
+    for pos, (_ts, _n, f, m) in enumerate(_entries(d)):
         try:
             same = _digest(f.read_bytes()) == h
         except OSError:
@@ -105,6 +105,11 @@ def snapshot(live, saved=False, keep=KEEP, now=None) -> dict:
         if same:
             if saved and not m.group("saved"):
                 f = f.rename(f.with_name(f.stem + "_saved.xml"))
+            elif pos and not m.group("saved"):
+                # back to an older automatic copy's content: re-date it as the newest, or pruning
+                # could delete the bindings SC had just before the next change (e.g. a crash reset)
+                f.unlink(missing_ok=True)
+                break
             return {"ok": True, "created": False, "backup": info(f), "msg": "Already backed up"}
     stamp = time.strftime("%Y-%m-%d_%H%M%S", time.localtime(now))
     taken = {(ts, n) for ts, n, _f, _m in _entries(d)}
