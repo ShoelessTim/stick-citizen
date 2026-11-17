@@ -192,6 +192,8 @@ class Api:
         self._fix = None               # Fix it: listening for one press (raw events only)
         self._fix_result = None        # last Fix it result, kept for "Fix in layout"
         self._scan_result = {}         # last whole-layout scan: finding id -> finding, for "Fix in layout"
+        self._helper_plan = None       # Setup helper: last suggestion, applied by helper_accept
+        self._helper_tables = None     # Setup helper: (reach, action use) from data/
         path = actionmaps if actionmaps is not None else (self._cfg.get("actionmaps_path") or find_actionmaps())
         if path:
             self._load(path)
@@ -648,6 +650,140 @@ class Api:
             self._scan_result.pop(finding_id, None)
             return self.save_layout(path)
         return {"ok": False, "msg": "That finding has no layout fix"}
+
+    # ----- Setup helper: where should a sequence of actions go on one stick? -----
+    STICK_KINDS = ("spring", "omni", "other")
+
+    def _helper_data(self):
+        if self._helper_tables is None:
+            from . import helper
+            self._helper_tables = helper.load_data()
+        return self._helper_tables
+
+    def _helper_row(self, mapname, action, use=""):
+        from . import helper
+        _reach, uses = self._helper_data()
+        return {"map": mapname, "action": action, "label": self._catalog.label(mapname, action),
+                "axis": self._catalog.is_axis(mapname, action), "mode": mode_of(mapname),
+                "use": use if use in helper.USES else helper.default_use(action, uses)}
+
+    def _stick_name(self, slot):
+        side = (self._slot(slot) or {}).get("side", "")
+        return "left stick" if side == "L" else "right stick" if side == "R" else f"js{slot}"
+
+    def _stick_kind(self, slot):
+        s = self._slot(slot) or {}
+        kinds = self._cfg.get("stick_kinds", {})
+        k = kinds.get(s.get("side") or str(slot), "spring")
+        return k if k in self.STICK_KINDS else "spring"
+
+    def helper_start(self):
+        """What the helper panel opens with: the sticks (and what kind each is), ready-made sequences, axis checks."""
+        self._sync_slots()
+        _reach, uses = self._helper_data()
+        presets = [{"id": p.get("id", ""), "name": p.get("name", ""),
+                    "rows": [self._helper_row(m, a) for m, a in p.get("actions", []) if self._catalog.get(m, a)]}
+                   for p in uses.get("presets", [])]
+        sticks = [{"slot": s["slot"], "side": s["side"], "name": s["name"], "kind": self._stick_kind(s["slot"])}
+                  for s in self._slots]
+        return {"ok": True, "presets": presets, "sticks": sticks, "checks": self.helper_checks()}
+
+    def helper_row(self, mapname, action):
+        """One action for the sequence list (label, axis or not, starting guess at how often it's used)."""
+        if not self._catalog.get(mapname, action):
+            return {"ok": False, "msg": "That action isn't in SC's list"}
+        return {"ok": True, "row": self._helper_row(mapname, action)}
+
+    def helper_suggest(self, slot, rows, keep_together=True):
+        """Suggest placements for an ordered sequence on one stick. Changes nothing until helper_accept."""
+        from . import helper
+        slot = int(slot)
+        reach, _uses = self._helper_data()
+        t = self._tpl(slot)
+        rows = [self._helper_row(r["map"], r["action"], r.get("use", "")) for r in rows or []
+                if self._catalog.get(r.get("map"), r.get("action"))]
+        if not rows:
+            return {"ok": False, "msg": "Add at least one action first"}
+        controls = [{"id": c.id, "name": f"{c.group} {c.label}".strip() if c.group else c.label, "group": c.group,
+                     "dir": c.dir, "key": c.inputs.get("base", ""), "axis": c.kind == "axis"} for c in t.controls]
+
+        def binds_at(key):
+            return [{"map": b.map, "action": b.action, "label": self._catalog.label(b.map, b.action), "mode": mode_of(b.map)}
+                    for b in self._bset.at(bind_key(slot, key))]
+
+        def where(mapname, action, key):
+            w = self._bset.where(mapname, action)
+            if not w or w == bind_key(slot, key):
+                return ""
+            return f"{self._stick_name(w[0])} {self.input_name(w[0], key_of(*w[1:]))}"
+
+        plan = helper.suggest(rows, controls, binds_at, reach=reach, mode_of=mode_of,
+                              keep_together=bool(keep_together), where=where)
+        skipped_setup = [c["name"] for c in controls if not c["key"]]
+        if skipped_setup:
+            plan["notes"].append(f"{len(skipped_setup)} control{'s' if len(skipped_setup) != 1 else ''} not set up yet "
+                                 "left out (run Set up to use them).")
+        plan.update(ok=True, slot=slot, stick=self._stick_name(slot), rows=rows, keep_together=bool(keep_together))
+        self._helper_plan = {"slot": slot, "plan": plan, "binds": {p["key"]: binds_at(p["key"]) for p in plan["placements"]}}
+        return plan
+
+    def helper_accept(self, skip=None):
+        """Apply the last suggestion to your bindings here (one Undo step brings back what was there).
+        Nothing is written: it goes to SC only as an exported layout (Save for Star Citizen)."""
+        last = self._helper_plan
+        if not last:
+            return {"ok": False, "msg": "Suggest a plan first"}
+        slot, plan, skip = last["slot"], last["plan"], {int(i) for i in (skip or [])}
+        todo = [p for p in plan["placements"] if p["i"] not in skip]
+        if not todo:
+            return {"ok": False, "msg": "Nothing ticked to place"}
+        for p in todo:     # the binds changed since the suggestion (edited by hand, a layout applied): suggest again
+            now = [(b.map, b.action) for b in self._bset.at(bind_key(slot, p["key"]))]
+            if now != [(b["map"], b["action"]) for b in last["binds"].get(p["key"], [])]:
+                return {"ok": False, "msg": "Your binds changed since the suggestion. Suggest again."}
+        self._bset._snapshot()
+        replaced = 0
+        for p in todo:
+            k = bind_key(slot, p["key"])
+            gone = {(d["map"], d["action"]) for d in p["displaces"]}
+            self._bset.binds[k] = [b for b in self._bset.at(k) if (b.map, b.action) not in gone]
+            replaced += len(gone)
+            self._bset._remove(p["map"], p["action"])          # SC: one input per action, so it moves here
+            act = "" if k[1] == "axis" else self._catalog.default_activation(p["map"], p["action"])
+            self._bset.binds.setdefault(k, []).append(Bound(p["map"], p["action"], act))
+        self._helper_plan = None
+        n = len(todo)
+        msg = f"Placed {n} action{'s' if n != 1 else ''} on the {self._stick_name(slot)}"
+        msg += f", replacing {replaced} bind{'s' if replaced != 1 else ''}" if replaced else ""
+        return self._ok(msg + ". Undo puts it back. Save for Star Citizen to export the layout.", placed=n, replaced=replaced)
+
+    def helper_checks(self):
+        """Axis sanity checks over the loaded bindings (helper.AXIS_CHECKS). Reads only."""
+        from . import helper
+        reach, _uses = self._helper_data()
+        self._sync_slots()
+        axes, buttons, slots = [], set(), set()
+        for k, lst in self._bset.binds.items():
+            for b in lst:
+                if k[1] != "axis":
+                    buttons.add(b.action)
+                    continue
+                key = key_of(k[1], k[2], k[3])
+                c, _layer = self._tpl(k[0]).control_for(key)
+                axes.append({"slot": k[0], "key": key, "map": b.map, "action": b.action,
+                             "name": self.input_name(k[0], key), "control": {"id": c.id} if c else None})
+                slots.add(k[0])
+        sticks = {s: {"stick": self._stick_name(s), "kind": self._stick_kind(s)} for s in slots | {x["slot"] for x in self._slots}}
+        return helper.axis_checks(sticks, axes, buttons, reach=reach)
+
+    def helper_set_kind(self, slot, kind):
+        """Spring-centred stick, Omni throttle, or something else (a throttle quadrant): decides the axis checks."""
+        if kind not in self.STICK_KINDS:
+            return {"ok": False, "msg": "Unknown kind of stick"}
+        s = self._slot(slot) or {}
+        self._cfg.setdefault("stick_kinds", {})[s.get("side") or str(int(slot))] = kind
+        configmod.save(self._cfg)
+        return {"ok": True, "checks": self.helper_checks()}
 
     @staticmethod
     def _image_path(t):

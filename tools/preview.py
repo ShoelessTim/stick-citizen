@@ -98,7 +98,28 @@ def build(workdir: Path, learned=True):
     state["layouts"] = api.list_layouts()
     state["fixes"] = fixes
     state["backups"] = fake_backups(workdir)
+    state["helper"] = fake_helper(api, by_side) if learned else {}
     return state, images, search
+
+
+def fake_helper(api, by_side):
+    """Real Setup helper results on the Sublight state shown: the ship start-up sequence on the right stick
+    (kept on one hat, and spread), and the axis checks for a layout with vertical lift on the left base wheel."""
+    from stick_citizen.bindings import Bound
+    start = api.helper_start()
+    rows = start["presets"][0]["rows"]
+    out = {"start": start, "plan": api.helper_suggest(by_side["R"], rows, True),
+           "spread": api.helper_suggest(by_side["R"], rows, False)}
+    lift = api._bset.where("spaceship_movement", "v_strafe_vertical")
+    api._bset.binds[lift] = [b for b in api._bset.binds[lift] if b.action != "v_strafe_vertical"]
+    api._bset.binds.setdefault((by_side["L"], "axis", 2, ""), []).append(Bound("spaceship_movement", "v_strafe_vertical"))
+    out["wheel"] = api.helper_checks()
+    api._bset.binds[(by_side["L"], "axis", 2, "")].pop()
+    api._bset.binds[lift].append(Bound("spaceship_movement", "v_strafe_vertical"))
+    api.helper_suggest(by_side["R"], rows, True)
+    out["accepted"] = api.helper_accept()["msg"]      # the real message for the plan shown, then put it back
+    api.undo()
+    return out
 
 
 def fake_backups(workdir: Path):
@@ -144,6 +165,11 @@ window.MOCK_API = (() => {
     backup_now: () => Promise.resolve({ ok: true, msg: "Saved a copy of your LIVE bindings (19 binds)", backup: F.backups.items[1], suggest: "MyBinds-2026-11-17" }),
     backup_export: () => Promise.resolve({ ok: true, msg: "Saved as “Restored-2026-11-17-1052”. In Star Citizen: Options → Keybindings → Control Profiles → “Restored-2026-11-17-1052”" }),
     fixit_scan: () => Promise.resolve(F.fixes.scan), fixit_scan_fix: () => ok("Moved 1 bind to js2. Saved."),
+    helper_start: () => Promise.resolve(F.helper.start), helper_checks: () => Promise.resolve(F.helper.start.checks),
+    helper_row: (m, a) => Promise.resolve({ ok: true, row: { map: m, action: a, label: a, axis: false, use: "sometimes" } }),
+    helper_suggest: (slot, rows, keep) => Promise.resolve(keep ? F.helper.plan : F.helper.spread),
+    helper_accept: () => Promise.resolve({ ok: true, msg: F.helper.accepted, placed: 5, state: F.state }),
+    helper_set_kind: () => Promise.resolve({ ok: true, checks: F.helper.wheel }),
   };
 })();
 """
@@ -156,7 +182,7 @@ def write_site(state, images, search, site: Path):
     shutil.copytree(web, site)
     axes = {s["slot"]: [0.35, -0.2, 0, 0, 0, 0.1] for s in state["sticks"]}
     (site / "fixture.js").write_text("window.FIXTURE = " + json.dumps(
-        {"state": state, "images": images, "search": search, "axes": axes, "layouts": state.pop("layouts"), "fixes": state.pop("fixes"), "backups": state.pop("backups")}) + ";\n" + MOCK, encoding="utf-8")
+        {"state": state, "images": images, "search": search, "axes": axes, "layouts": state.pop("layouts"), "fixes": state.pop("fixes"), "backups": state.pop("backups"), "helper": state.pop("helper")}) + ";\n" + MOCK, encoding="utf-8")
     html = (site / "index.html").read_text(encoding="utf-8")
     (site / "index.html").write_text(html.replace('<script src="app.js', '<script src="fixture.js"></script>\n<script src="app.js'), encoding="utf-8")
 
@@ -212,6 +238,12 @@ def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
             snap("12-backups", "fixClose(); backupsFlow().then(() => document.querySelectorAll('.bk-row .btn')[1].click())", 600)
             snap("13-backups-saved", "document.querySelector('#modal .btn.go').click()", 600)
             snap("14-backups-restored", "backupsFlow({msg: 'Saved as “Restored-2026-11-17-1052”. In Star Citizen: Options → Keybindings → Control Profiles → “Restored-2026-11-17-1052”'})", 600)
+            # Setup helper: the ship start-up sequence on the right stick, its preview on the photo, spread, accepted
+            snap("15-helper-sequence", "closeModal(); S.live = {}; window.__events.push({slot:%s,key:'b60',on:false}); helperFlow().then(() => { S.help.slot = %s; S.stick = S.help.slot; render(); document.querySelector('.hp-empty .btn').click(); })" % (r, r), 700)
+            snap("16-helper-preview", "helperSuggest()", 700)
+            snap("17-helper-spread", "document.querySelector('.hp-keep input').click(); helperSuggest().then(() => { const b = document.querySelector('#helper'); b.scrollTop = 1e6; })", 700)
+            snap("18-helper-axis-check", "const sel = document.querySelector('.hp-kind select'); sel.value = 'omni'; sel.dispatchEvent(new Event('change')); setTimeout(() => { document.querySelector('#helper').scrollTop = 1e6; }, 100)", 700)
+            snap("19-helper-accepted", "document.querySelector('.hp-keep input').click(); helperSuggest().then(() => helperAccept()).then(() => { document.querySelector('#helper').scrollTop = 0; })", 700)
         b.close()
     return shots, errors
 

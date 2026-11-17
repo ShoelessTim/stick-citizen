@@ -123,6 +123,7 @@ function render() {
   const list = shown();
   app.classList.toggle("both", list.length > 1);
   app.classList.toggle("edit", S.view === "edit");
+  app.classList.toggle("helping", !!S.help);
   renderTabs();
   renderModes();
   $("#btnVoice").classList.toggle("off", !S.state.speech);
@@ -139,6 +140,7 @@ function render() {
   }
   renderStage();
   renderOthers();
+  renderHelper();
 }
 
 function renderTabs() {
@@ -286,12 +288,22 @@ function drawCard(stage, svg, stick, p, x, y, w, ch, side, compact) {
     a = (g.hat ? (DIR_ARROW[shown_.m.dir] || "") + " " : "") + shown_.b.label;
     aTag = tagFor(shown_.b.activation);
   }
-  const more = (main ? main.more : 0) + extra;
-  const card = h("button", { class: cls, style: `left:${x}px;top:${y}px;width:${w}px;height:${ch}px`,
+  let more = (main ? main.more : 0) + extra;
+  // Setup helper preview: what this control would get, in amber, and what it would replace
+  const props = helperProps(stick, g);
+  let was = null;
+  if (props.length) {
+    a = props.map((pp) => ((g.hat ? (DIR_ARROW[pp.dir] || "") + " " : "") + pp.label)).join(" · ");
+    aTag = "NEW"; more = 0;
+    const gone = props.flatMap((pp) => pp.displaces.map((d) => d.label));
+    was = gone.length ? "replaces " + gone.join(", ") : "free";
+  }
+  const card = h("button", { class: cls + (props.length ? " prop" : ""), style: `left:${x}px;top:${y}px;width:${w}px;height:${ch}px`, title: props.length ? a : null,
     onclick: () => openDrawer(stick.slot, g.id) },
     h("div", { class: "hd" }, h("span", { class: "n" }, String(p.num)), h("span", { class: "name" }, g.name.toUpperCase()), h("span", { class: "code" }, codes)),
     h("div", { class: "a" + (a ? "" : " none") }, a || (target ? `Press it now${g.hat ? " · " + (DIR_ARROW[(stick.controls.find((c) => c.id === S.coach.cid) || {}).dir] || "") : ""}` : unset ? "Not set up · press to learn" : isShiftCtl ? "Hold for ⇧ layer" : "—"),
       aTag ? h("span", { class: "tag" }, aTag) : null, more > 0 ? h("span", { class: "tag" }, "+" + more) : null),
+    was ? h("div", { class: "s was" + (was === "free" ? " none" : "") }, was) :
     (!compact || (ch >= 48 && (shift || isShiftCtl))) ? h("div", { class: "s" + (shift ? "" : " none") },
       shift ? ["⇧ " + shift.b.label, tagFor(shift.b.activation) ? h("span", { class: "tag" }, tagFor(shift.b.activation)) : null]
         : (isShiftCtl ? "stick firmware" : "⇧ —")) : null);
@@ -303,8 +315,9 @@ function drawCard(stage, svg, stick, p, x, y, w, ch, side, compact) {
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute("d", `M${ex},${cy} H${elbow} L${p.x},${p.y}`);
   if (hot) path.setAttribute("class", "hot" + (hotShift ? " shift" : ""));
+  else if (props.length) path.setAttribute("class", "prop");
   svg.append(path);
-  const dot = h("div", { class: ["dot", hot && "hot", hotShift && "shift", (sel || target) && "sel", target && "target", unset && "unset", isShiftCtl && "shiftkey"].filter(Boolean).join(" "),
+  const dot = h("div", { class: ["dot", hot && "hot", hotShift && "shift", (sel || target) && "sel", target && "target", unset && "unset", isShiftCtl && "shiftkey", props.length && "prop"].filter(Boolean).join(" "),
     style: `left:${p.x}px;top:${p.y}px`, title: g.name }, String(p.num));
   if (S.view === "edit") dot.addEventListener("pointerdown", (e) => startDrag(e, stick, g, dot));
   stage.append(dot);
@@ -813,6 +826,7 @@ function fixMouse(e) {
 
 async function fixitFlow() {
   closeDrawer();
+  if (S.help) helperClose();
   const r = await API.fixit_arm(S.mode);
   S.fix = { state: "wait", until: Date.now() + 1000 * ((r && r.wait) || 6), mouse: false };
   window.addEventListener("mousemove", fixMouse);
@@ -837,6 +851,7 @@ function fixGot(res) {
 const SCAN_Q = { bound: "NOT BOUND", wrong_stick: "WRONG STICK (JS1 / JS2)", mode: "WRONG CATEGORY", conflict: "TWO ACTIONS ON ONE INPUT", dead: "THE STICK NEVER SENDS IT" };
 
 async function fixitScan() {
+  if (S.help) helperClose();
   if (S.fix && S.fix.state === "wait") API.fixit_cancel();
   window.removeEventListener("mousemove", fixMouse);
   const spare = !!(S.fix && S.fix.spare);
@@ -943,6 +958,167 @@ function renderFix() {
     h("button", { class: "btn go", onclick: fixitFlow }, "Try another control")));
 }
 
+/* ---------------- Setup helper ----------------
+   A second mode alongside Fix it. You list the SC actions you want on one hand, in order, and pick the stick;
+   Python (helper.py) suggests where each goes by reach and how often it's used, keeping a sequence on one hat
+   when it fits. The suggestion shows on the stick photo; nothing changes until Accept, and Accept is one Undo
+   step on your bindings here. It reaches SC only through Save for Star Citizen (an exported layout).
+   Axis checks (vertical lift first) run on the loaded bindings and sit at the bottom of the panel. */
+const USE_NAMES = { often: "Often", sometimes: "Sometimes", rare: "Rare" };
+const KIND_NAMES = { spring: "Spring-centred", omni: "Omni throttle", other: "Other (throttle, pedals)" };
+const ZONE_NAMES = { thumb: "thumb", index: "index finger", pinky: "pinky", base: "base", other: "your own control" };
+
+async function helperFlow() {
+  if (S.fix) fixClose();
+  closeDrawer();
+  const st = await API.helper_start();
+  const pref = st.sticks.find((s) => s.slot === S.stick) || st.sticks.find((s) => s.side === "L") || st.sticks[0];
+  S.help = { slot: pref ? pref.slot : null, rows: [], keep: true, plan: null, skip: new Set(), done: null,
+    presets: st.presets, sticks: st.sticks, checks: st.checks, results: [], q: "" };
+  if (S.help.slot != null) S.stick = S.help.slot;
+  render();
+}
+
+function helperClose() {
+  S.help = null;
+  render();
+}
+
+function helperStale() { if (S.help) { S.help.plan = null; S.help.done = null; S.help.skip = new Set(); } }
+
+async function helperAdd(a) {
+  const r = await API.helper_row(a.map, a.action);
+  if (!r.ok) { toast(r.msg); return; }
+  if (!S.help.rows.some((x) => x.map === a.map && x.action === a.action)) S.help.rows.push(r.row);
+  S.help.q = ""; S.help.results = [];
+  helperStale();
+  render();
+  const i = $("#helper .hp-add input"); i && i.focus();
+}
+
+async function helperSuggest() {
+  const H = S.help;
+  const plan = await API.helper_suggest(H.slot, H.rows.map((r) => ({ map: r.map, action: r.action, use: r.use })), H.keep);
+  if (!plan.ok) { toast(plan.msg); return; }
+  H.plan = plan; H.skip = new Set(); H.done = null;
+  H.rows = plan.rows;
+  render();
+}
+
+async function helperAccept() {
+  const r = await API.helper_accept([...S.help.skip]);
+  if (!r.ok) { toast(r.msg); return; }
+  S.help.done = { msg: r.msg, placed: r.placed };
+  S.help.plan = null;
+  S.help.checks = await API.helper_checks();
+  apply(r);
+}
+
+/* preview on the photo: the placements on this card's controls */
+function helperProps(stick, g) {
+  const H = S.help;
+  if (!H || !H.plan || H.plan.slot !== stick.slot) return [];
+  return H.plan.placements.filter((p) => !H.skip.has(p.i) && g.members.some((m) => m.id === p.cid));
+}
+
+function helperRow(p) {
+  const H = S.help, on = !H.skip.has(p.i);
+  const what = p.displaces.length ? `Replaces ${p.displaces.map((d) => d.label).join(", ")}`
+    : p.keeps.length ? `Free in this mode (keeps ${p.keeps.map((d) => `${d.label}, ${modeName(d.mode)}`).join("; ")})` : "Free";
+  return h("label", { class: "hp-place" + (on ? "" : " off") + (p.displaces.length ? " swap" : "") },
+    h("input", { type: "checkbox", checked: on || null, onchange: (e) => { if (e.target.checked) H.skip.delete(p.i); else H.skip.add(p.i); render(); } }),
+    h("span", { class: "n" }, String(p.i + 1)),
+    h("div", {}, h("div", { class: "t" }, p.label, h("span", { class: "arrow" }, " → "), h("b", {}, (p.group ? `${p.group} ${DIR_ARROW[p.dir] || ""}` : p.control).trim())),
+      h("div", { class: "f" }, `${USE_NAMES[p.use]} · ${ZONE_NAMES[p.zone] || p.zone}, reach ${p.rank}/10 · ${what}` + (p.moves_from ? ` · moves from ${p.moves_from}` : ""))));
+}
+
+function helperChecks(box) {
+  const H = S.help, c = H.checks || { findings: [] };
+  box.append(h("div", { class: "hp-sec" }, "AXIS CHECKS"));
+  box.append(h("div", { class: "hp-kinds" }, H.sticks.map((s) => h("div", { class: "hp-kind" },
+    h("span", {}, `${sideName(s)[0].toUpperCase() + sideName(s).slice(1)} stick`),
+    h("select", { "aria-label": `${sideName(s)} stick kind`, onchange: async (e) => {
+      const r = await API.helper_set_kind(s.slot, e.target.value);
+      if (r.ok) { s.kind = e.target.value; H.checks = r.checks; render(); } } },
+      Object.entries(KIND_NAMES).map(([k, n]) => h("option", { value: k, selected: s.kind === k || null }, n)))))));
+  const rows = c.findings.map((f) => h("div", { class: "fx-row " + f.level },
+    h("i", { class: "fx-light", "aria-label": f.level === "bad" ? "Problem" : "Check this" }),
+    h("div", {}, h("div", { class: "q" }, "VERTICAL LIFT"), h("div", { class: "t" }, f.title)),
+    h("div", { class: "f" }, f.fix)));
+  if (!rows.length) rows.push(h("div", { class: "fx-row ok" }, h("i", { class: "fx-light", "aria-label": "OK" }),
+    h("div", {}, h("div", { class: "q" }, "VERTICAL LIFT"), h("div", { class: "t" }, "On a centred axis"))));
+  box.append(h("div", { class: "fx-rows" }, rows));
+  if (c.note) box.append(h("div", { class: "fx-note" }, c.note));
+}
+
+function renderHelper() {
+  const box = $("#helper");
+  $("#btnHelper") && $("#btnHelper").classList.toggle("on", !!S.help);
+  if (!S.help) { box.hidden = true; box.innerHTML = ""; return; }
+  const H = S.help;
+  const keepScroll = box.scrollTop;
+  box.hidden = false;
+  box.innerHTML = "";
+  box.append(h("div", { class: "fx-head" }, h("span", { class: "tag" }, "SETUP HELPER"), h("h2", {}, "Put a sequence on one hand"),
+    h("button", { class: "icon", "aria-label": "Close Setup helper", onclick: helperClose, html: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>' })));
+  box.append(h("div", { class: "hp-stick seg" }, H.sticks.map((s) => h("button", { class: H.slot === s.slot ? "on" : "",
+    onclick: () => { H.slot = s.slot; S.stick = s.slot; helperStale(); render(); } }, `${sideName(s)[0].toUpperCase() + sideName(s).slice(1)} stick`))));
+  // the sequence, in order
+  box.append(h("div", { class: "hp-sec" }, "SEQUENCE", h("span", {}, "in the order you use them")));
+  const list = H.rows.map((r, i) => h("div", { class: "hp-row" },
+    h("span", { class: "n" }, String(i + 1)),
+    h("div", { class: "t" }, r.label, r.axis ? h("span", { class: "tag" }, "AXIS") : null),
+    h("select", { "aria-label": "How often", onchange: (e) => { r.use = e.target.value; helperStale(); render(); } },
+      Object.entries(USE_NAMES).map(([k, n]) => h("option", { value: k, selected: r.use === k || null }, n))),
+    h("button", { class: "icon sm", title: "Earlier", "aria-label": "Move earlier", disabled: !i || null,
+      onclick: () => { [H.rows[i - 1], H.rows[i]] = [H.rows[i], H.rows[i - 1]]; helperStale(); render(); } }, "↑"),
+    h("button", { class: "icon sm", title: "Remove", "aria-label": "Remove", onclick: () => { H.rows.splice(i, 1); helperStale(); render(); } }, "✕")));
+  if (!list.length) list.push(h("div", { class: "hp-empty" }, "Add the actions you want on this stick, in the order you press them.",
+    H.presets.map((p) => h("button", { class: "btn", onclick: () => { H.rows = p.rows.map((r) => ({ ...r })); helperStale(); render(); } }, `Use “${p.name}”`))));
+  box.append(h("div", { class: "hp-rows" }, list));
+  const input = h("input", { placeholder: "Add an action: power, gear, quantum…", value: H.q, "aria-label": "Add an action" });
+  let t = null;
+  input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(async () => {
+    H.q = input.value;
+    H.results = H.q.trim() ? (await API.search(H.q, "all", 8)) : [];
+    renderHelperResults();
+  }, 120); });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter" && H.results[0]) helperAdd(H.results[0]); });
+  box.append(h("div", { class: "hp-add search" }, input, h("div", { class: "hp-res" })));
+  renderHelperResults();
+  box.append(h("label", { class: "hp-keep" }, h("input", { type: "checkbox", checked: H.keep || null,
+    onchange: (e) => { H.keep = e.target.checked; helperStale(); render(); } }), "Keep the sequence on one hat if it fits"));
+  // the suggestion
+  if (H.plan) {
+    const n = H.plan.placements.length - H.skip.size;
+    box.append(h("div", { class: "hp-sec" }, "SUGGESTION", h("span", {}, H.plan.together ? `all on ${H.plan.together}` : "spread by reach and use")));
+    box.append(h("div", { class: "hp-rows" }, H.plan.placements.map(helperRow)));
+    for (const s of H.plan.skipped) box.append(h("div", { class: "fx-note" }, `${s.label}: ${s.why}`));
+    for (const note of H.plan.notes) box.append(h("div", { class: "fx-note quiet" }, note));
+    box.append(h("div", { class: "fx-note quiet" }, "Shown on the stick in amber. Nothing changes until you accept."));
+    box.append(h("div", { class: "fx-btns" }, h("button", { class: "btn", onclick: () => { helperStale(); render(); } }, "Cancel"),
+      h("button", { class: "btn go", disabled: !n || null, onclick: helperAccept }, `Accept ${n} placement${n === 1 ? "" : "s"}`)));
+  } else if (H.done) {
+    box.append(h("div", { class: "bk-msg" }, H.done.msg));
+    box.append(h("div", { class: "fx-btns" },
+      h("button", { class: "btn", onclick: async () => { H.done = null; apply(await API.undo()); H.checks = await API.helper_checks(); render(); } }, "Undo"),
+      h("button", { class: "btn go", onclick: async () => apply(await API.save_layout()) }, "Save for Star Citizen")));
+  } else {
+    box.append(h("div", { class: "fx-btns" }, h("button", { class: "btn go", disabled: !H.rows.length || null, onclick: helperSuggest }, "Suggest placements")));
+  }
+  helperChecks(box);
+  box.scrollTop = keepScroll;
+}
+
+function renderHelperResults() {
+  const res = $("#helper .hp-res");
+  if (!res) return;
+  res.innerHTML = "";
+  res.hidden = !S.help.results.length;
+  for (const a of S.help.results) res.append(h("button", { class: "res", onclick: () => helperAdd(a) },
+    h("span", { class: "t" }, a.label), h("span", { class: "g" }, a.group), a.bound ? h("span", { class: "b" }, a.bound) : null));
+}
+
 /* ---------------- live input ---------------- */
 async function pollLoop() {
   for (;;) {
@@ -981,7 +1157,7 @@ function onPress(slot, key) {
   $("#liveSub").textContent = `${where}${layer === "shift" ? " ⇧" : ""} · ${stick.side === "L" ? "left" : stick.side === "R" ? "right" : "js" + slot} stick`;
   if (b && S.state.speech) API.say(b.action);
   // a single-stick view follows the stick you touch
-  if (S.stick !== "both" && S.stick !== slot && sticks().length > 1 && S.view === "sticks") { S.stick = slot; render(); }
+  if (S.stick !== "both" && S.stick !== slot && sticks().length > 1 && S.view === "sticks" && !S.help) { S.stick = slot; render(); }
 }
 
 function renderMeters() {
@@ -1110,12 +1286,16 @@ function wire() {
     if (e.target.tagName === "INPUT") return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); apply(await API.undo()); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); apply(await API.save_layout()); }
-    if (e.key === "Escape") { if (!$("#modal").hidden) closeModal(); else if (S.sel) closeDrawer(); else if (S.fix) fixClose(); }
+    if (e.key === "Escape") { if (!$("#modal").hidden) closeModal(); else if (S.sel) closeDrawer(); else if (S.fix) fixClose(); else if (S.help) helperClose(); }
   });
   // Fix it lives in the sticks view: a button in the bar opens its panel over the stage
   const fixBtn = h("button", { class: "chip fix", id: "btnFix", title: "A control does nothing in Star Citizen? Press it and see why.",
     onclick: () => (S.fix ? fixClose() : fixitFlow()) }, "Fix it: a control does nothing");
   $(".bar").insertBefore(fixBtn, $("#hint"));
+  // the Setup helper is the second mode next to Fix it: a panel beside the stick photo
+  const helpBtn = h("button", { class: "chip fix", id: "btnHelper", title: "Tell it the actions you want on one hand; it suggests where they go.",
+    onclick: () => (S.help ? helperClose() : helperFlow()) }, "Setup helper");
+  $(".bar").insertBefore(helpBtn, $("#hint"));
   // edit mode gets a "Map a control" button in the bar
   const mapBtn = h("button", { class: "chip", id: "btnMap", style: "border-style:dashed;color:var(--cyan-soft)", onclick: () => mapFlow() }, "+ Map a control");
   $(".bar").insertBefore(mapBtn, $("#hint"));
@@ -1130,8 +1310,9 @@ function wire() {
   copyBtn.hidden = true;
   const obs = new MutationObserver(() => {
     mapBtn.hidden = copyBtn.hidden = resetBtn.hidden = S.view !== "edit";
-    fixBtn.hidden = S.view === "edit";
+    fixBtn.hidden = helpBtn.hidden = S.view === "edit";
     if (S.view === "edit" && S.fix) fixClose();
+    if (S.view !== "sticks" && S.help) helperClose();
   });
   obs.observe($("#app"), { attributes: true, attributeFilter: ["class"] });
   mapBtn.hidden = true;
