@@ -701,3 +701,114 @@ def test_scan_readouts_stay_separate():
     sc = layout_readout(bs)
     assert sc[(1, "b1")][0]["known"] == ""                   # no SC list given: category not judged
     assert scan({1: stick}, sc)["findings"] == []
+
+
+# ---------------------------------------------------------------- backups of SC's live bindings
+def _live_sc(tmp_path, text=None):
+    """A fake SC install: LIVE\\user\\client\\0\\Profiles\\default\\actionmaps.xml plus its controls folder."""
+    base = tmp_path / "StarCitizen" / "LIVE" / "user" / "client" / "0"
+    (base / "controls").mkdir(parents=True)
+    live = base / "Profiles" / "default" / "actionmaps.xml"
+    live.parent.mkdir(parents=True)
+    live.write_text(text or DEMO.read_text())
+    return live
+
+
+def _backups(api):
+    return api.backup_list()["items"]
+
+
+def test_backup_on_launch_and_when_sc_changes_binds(tmp_path, monkeypatch):
+    live = _live_sc(tmp_path)
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path / "home"))
+    from stick_citizen.webapi import Api, FakeHub
+    api = Api(FakeHub([]), actionmaps=str(live))
+    items = _backups(api)
+    assert len(items) == 1 and items[0]["kind"] == "auto" and items[0]["channel"] == "LIVE"
+    assert items[0]["binds"] == 19 and items[0]["size"] == live.stat().st_size
+    assert api._backup_tick() is None                       # nothing changed: nothing new
+    live.write_text(DEMO.read_text().replace("js2_button6", "js2_button16"))
+    os.utime(live, (live.stat().st_mtime + 5,) * 2)
+    assert api._backup_tick()["created"] and len(_backups(api)) == 2
+    api.BACKUP_EVERY, api._live_check = 0, 0               # and from poll() while running
+    live.write_text(DEMO.read_text().replace("js2_button7", "js2_button17"))
+    os.utime(live, (live.stat().st_mtime + 10,) * 2)
+    assert "backed up" in api.poll()["backup"] and len(_backups(api)) == 3
+
+
+def test_backup_dedupes_identical_content_and_skips_half_written(tmp_path, monkeypatch):
+    from stick_citizen import backups
+    live = _live_sc(tmp_path)
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path / "home"))
+    assert backups.snapshot(live, now=1_700_000_000)["created"]
+    os.utime(live, (live.stat().st_mtime + 5,) * 2)        # SC touched the file, same content
+    r = backups.snapshot(live, now=1_700_000_100)
+    assert r["ok"] and not r["created"] and len(backups.list_backups()) == 1
+    r = backups.snapshot(live, saved=True)                  # "Save my current config" on the same content: kept for good
+    assert not r["created"] and r["backup"]["kind"] == "saved" and len(backups.list_backups()) == 1
+    live.write_text(DEMO.read_text()[:400])                 # SC halfway through writing it
+    r = backups.snapshot(live)
+    assert r["ok"] is False and len(backups.list_backups()) == 1
+
+
+def test_backup_prunes_to_last_20_automatic_keeps_saved(tmp_path, monkeypatch):
+    from stick_citizen import backups
+    live = _live_sc(tmp_path)
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path / "home"))
+    backups.snapshot(live, saved=True, now=1_600_000_000)
+    for i in range(25):
+        live.write_text(DEMO.read_text().replace("js2_button6", f"js2_button{30 + i}"))
+        backups.snapshot(live, now=1_700_000_000 + i)
+    items = backups.list_backups()
+    autos = [b for b in items if b["kind"] == "auto"]
+    assert len(autos) == 20 and len([b for b in items if b["kind"] == "saved"]) == 1
+    newest = backups.get(autos[0]["id"]).read_text()
+    assert "js2_button54" in newest                          # the newest ones stay, oldest go
+    assert not any("js2_button30\"" in backups.get(b["id"]).read_text() for b in autos)
+
+
+def test_save_my_config_and_restore_as_export_never_writes_live(tmp_path, monkeypatch):
+    from stick_citizen.actionmaps import load_profile as lp
+    live = _live_sc(tmp_path, DEMO.read_text().replace(
+        '<actionmap name="spaceship_movement">',
+        '<actionmap name="spaceship_movement">\n   <action name="v_strafe_up"><rebind input="kb1_space"/></action>'))
+    before, mtime = live.read_bytes(), live.stat().st_mtime
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path / "home"))
+    from stick_citizen.webapi import Api, FakeHub
+    api = Api(FakeHub([]), actionmaps=str(live))
+    r = api.backup_now()
+    assert r["ok"] and r["backup"]["kind"] == "saved" and r["suggest"].startswith("MyBinds-")
+    out = api.backup_export(r["backup"]["id"], "My Binds!")
+    assert out["ok"] and "Control Profiles" in out["msg"] and out["profile"] == "My-Binds"
+    f = Path(out["path"])
+    assert f.parent == live.parents[2] / "controls" / "mappings" and f.name == "layout_My-Binds_exported.xml"
+    xml = f.read_text()
+    assert 'profileName="My-Binds"' in xml and "<CustomisationUIHeader" in xml and 'input="kb1_space"' in xml   # keyboard too
+    p = lp(f)
+    assert p.lookup((2, "button", 6, ""))[0].action == "v_toggle_landing_system" and set(p.devices) == {1, 2}
+    again = api.backup_export(r["backup"]["id"], "My Binds!")             # never overwrites an earlier export
+    assert Path(again["path"]).name == "layout_My-Binds-2_exported.xml"
+    assert api.backup_export(r["backup"]["id"], "x", str(live))["ok"] is False   # refuses the live file
+    assert api.backup_export("../../actionmaps.xml", "x")["ok"] is False          # only real backups
+    assert live.read_bytes() == before and live.stat().st_mtime == mtime          # the live file is never written
+
+
+def test_restore_after_sc_reset_brings_back_old_binds(tmp_path, monkeypatch):
+    """Tim's crash: SC resets to defaults. The backup from before still restores every custom bind."""
+    live = _live_sc(tmp_path)
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path / "home"))
+    from stick_citizen.actionmaps import load_profile as lp
+    from stick_citizen.webapi import Api, FakeHub
+    api = Api(FakeHub([]), actionmaps=str(live))
+    live.write_text('<ActionMaps><ActionProfiles profileName="default"></ActionProfiles></ActionMaps>')   # reset
+    os.utime(live, (live.stat().st_mtime + 5,) * 2)
+    api._backup_tick()
+    items = _backups(api)
+    assert [b["binds"] for b in items] == [0, 19]            # newest first: you can see which one had your binds
+    out = api.backup_export(items[1]["id"], "", str(tmp_path / "mappings" / "layout_Before_exported.xml"))
+    assert out["ok"] and len(lp(out["path"]).bindings) == len(lp(DEMO).bindings) == 19
+
+
+def test_backup_without_sc_install(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)                  # demo file isn't SC's live actionmaps.xml
+    assert api.backup_list()["live"] == "" and api.backup_now()["ok"] is False

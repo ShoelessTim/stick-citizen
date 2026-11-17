@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stick Citizen</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 640'%3E%3Cpolygon points='320,20 580,170 580,470 320,620 60,470 60,170' fill='%23121A22' stroke='%23F0A43A' stroke-width='40'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="app.css?v=3.9.0">
+<link rel="stylesheet" href="app.css?v=3.10.0">
 </head>
 <body>
 <div id="app">
@@ -27,6 +27,8 @@
       <div class="seg" id="stickTabs" role="tablist" aria-label="Stick"></div>
       <button class="icon" id="btnLayouts" title="Start from a layout" aria-label="Start from a layout">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
+      <button class="icon" id="btnBackups" title="Backups of your SC bindings: save, restore" aria-label="Backups">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 108-8 8 8 0 00-6.3 3"/><path d="M4 4v4h4"/><path d="M12 8v4l3 2"/></svg></button>
       <button class="icon" id="btnOpen" title="Open bindings (actionmaps.xml or a layout)" aria-label="Open bindings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg></button>
       <button class="icon" id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo">
@@ -67,6 +69,6 @@
   <div id="modal" class="modal" hidden></div>
   <div id="toast" class="toast" hidden></div>
 </div>
-<script src="app.js?v=3.9.0"></script>
+<script src="app.js?v=3.10.0"></script>
 </body>
 </html>

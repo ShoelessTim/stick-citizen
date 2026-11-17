@@ -97,7 +97,28 @@ def build(workdir: Path, learned=True):
     state = api.get_state()
     state["layouts"] = api.list_layouts()
     state["fixes"] = fixes
+    state["backups"] = fake_backups(workdir)
     return state, images, search
+
+
+def fake_backups(workdir: Path):
+    """Real backups (stick_citizen.backups) of a fake SC install: a saved copy, edits, then a crash reset."""
+    import time as _t
+    from stick_citizen import backups
+    base = workdir / "StarCitizen" / "LIVE" / "user" / "client" / "0"
+    (base / "controls" / "mappings").mkdir(parents=True, exist_ok=True)
+    live = base / "Profiles" / "default" / "actionmaps.xml"
+    live.parent.mkdir(parents=True, exist_ok=True)
+    demo = (ROOT / "samples" / "demo_actionmaps.xml").read_text()
+    t0 = _t.mktime((2026, 11, 17, 9, 12, 5, 0, 0, -1))
+    steps = [(demo, True, 0), (demo.replace("js2_button6", "js2_button16"), False, 2400),
+             (demo.replace("js2_button7", "js2_button17").replace("</actionmap>", '<action name="v_lights"><rebind input="js1_button9"/></action></actionmap>', 1), False, 4100),
+             ('<ActionMaps><ActionProfiles profileName="default"></ActionProfiles></ActionMaps>', False, 5520)]
+    for text, saved, dt in steps:
+        live.write_text(text)
+        backups.snapshot(live, saved=saved, now=t0 + dt)
+    return {"live": "C:\\Program Files\\Roberts Space Industries\\StarCitizen\\LIVE\\user\\client\\0\\Profiles\\default\\actionmaps.xml",
+            "channel": "LIVE", "items": backups.list_backups(), "keep": backups.KEEP, "folder": "", "mappings": ""}
 
 
 MOCK = r"""
@@ -119,6 +140,9 @@ window.MOCK_API = (() => {
     list_layouts: () => Promise.resolve(F.layouts), apply_layout: () => ok("Applied"),
     fixit_arm: () => Promise.resolve({ ok: true, wait: 6 }), fixit_mouse: () => Promise.resolve({ ok: true }),
     fixit_cancel: () => Promise.resolve({ ok: true }), fixit_fix: () => ok("Moved 1 bind to this stick. Saved."),
+    backup_list: () => Promise.resolve(F.backups),
+    backup_now: () => Promise.resolve({ ok: true, msg: "Saved a copy of your LIVE bindings (19 binds)", backup: F.backups.items[1], suggest: "MyBinds-2026-11-17" }),
+    backup_export: () => Promise.resolve({ ok: true, msg: "Saved as “Restored-2026-11-17-1052”. In Star Citizen: Options → Keybindings → Control Profiles → “Restored-2026-11-17-1052”" }),
     fixit_scan: () => Promise.resolve(F.fixes.scan), fixit_scan_fix: () => ok("Moved 1 bind to js2. Saved."),
   };
 })();
@@ -132,7 +156,7 @@ def write_site(state, images, search, site: Path):
     shutil.copytree(web, site)
     axes = {s["slot"]: [0.35, -0.2, 0, 0, 0, 0.1] for s in state["sticks"]}
     (site / "fixture.js").write_text("window.FIXTURE = " + json.dumps(
-        {"state": state, "images": images, "search": search, "axes": axes, "layouts": state.pop("layouts"), "fixes": state.pop("fixes")}) + ";\n" + MOCK, encoding="utf-8")
+        {"state": state, "images": images, "search": search, "axes": axes, "layouts": state.pop("layouts"), "fixes": state.pop("fixes"), "backups": state.pop("backups")}) + ";\n" + MOCK, encoding="utf-8")
     html = (site / "index.html").read_text(encoding="utf-8")
     (site / "index.html").write_text(html.replace('<script src="app.js', '<script src="fixture.js"></script>\n<script src="app.js'), encoding="utf-8")
 
@@ -185,6 +209,9 @@ def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
             snap("9-fixit-mouse-mode", "fixGot(FIXTURE.fixes.mouse)")
             snap("10-fixit-scan", "fixitScan()", 600)
             snap("11-fixit-scan-spare", "document.querySelector('.fixit').scrollTop = 1e6; document.querySelector('.fx-spare').open = true; setTimeout(() => { document.querySelector('.fixit').scrollTop = document.querySelector('.fx-spare').offsetTop - 20; }, 50)", 600)
+            snap("12-backups", "fixClose(); backupsFlow().then(() => document.querySelectorAll('.bk-row .btn')[1].click())", 600)
+            snap("13-backups-saved", "document.querySelector('#modal .btn.go').click()", 600)
+            snap("14-backups-restored", "backupsFlow({msg: 'Saved as “Restored-2026-11-17-1052”. In Star Citizen: Options → Keybindings → Control Profiles → “Restored-2026-11-17-1052”'})", 600)
         b.close()
     return shots, errors
 

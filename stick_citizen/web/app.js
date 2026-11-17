@@ -949,6 +949,7 @@ async function pollLoop() {
     try {
       const r = await API.poll();
       if (r.captured && S.capture) { const f = S.capture; S.capture = null; f(r.captured); }
+      if (r.backup) toast(r.backup);
       if (r.fixit) fixGot(r.fixit);
       else if (S.fix && S.fix.state === "wait") renderFix();
       let dirty = false;
@@ -1052,7 +1053,52 @@ async function layoutsFlow() {
     h("div", { class: "row" }, h("button", { class: "btn", onclick: closeModal }, "Cancel"))]);
 }
 
+/* ---------------- Backups of SC's bindings ----------------
+   Stick Citizen copies SC's actionmaps.xml whenever it changes (automatic) or when you ask (saved, kept for good).
+   Restore writes a backup out as an exported layout in controls\mappings; SC's live file is never written. */
+const fileSize = (n) => (n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
+
+async function backupsFlow(opts = {}) {
+  const data = await API.backup_list();
+  const msg = opts.msg ? h("div", { class: "bk-msg" + (opts.bad ? " bad" : "") }, opts.msg) : null;
+  const exportRow = (b, label, name) => {
+    const input = h("input", { class: "bk-name", value: name, "aria-label": "Layout name", spellcheck: "false" });
+    const go = async () => {
+      const r = await API.backup_export(b.id, input.value);
+      backupsFlow({ msg: r.msg, bad: !r.ok });
+    };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+    return h("div", { class: "bk-export" }, h("span", {}, "Layout name"), input, h("button", { class: "btn go", onclick: go }, label));
+  };
+  const rows = data.items.map((b) => {
+    const row = h("div", { class: "bk-row" },
+      h("div", {}, h("b", {}, b.when), h("span", { class: "tag " + b.kind }, b.kind === "saved" ? "SAVED" : "AUTO"),
+        h("div", { class: "sub" }, `${b.channel} · ${b.binds} binds · ${fileSize(b.size)}`)),
+      h("button", { class: "btn", onclick: () => {
+        row.querySelector(".bk-export") || row.append(exportRow(b, "Restore as layout", "Restored-" + b.when.slice(0, 16).replace(" ", "-").replace(":", "")));
+        row.querySelector(".bk-name").focus();
+      } }, "Restore…"));
+    return row;
+  });
+  const offer = opts.offer ? h("div", { class: "bk-offer" },
+    h("p", {}, "Also save it as a layout Star Citizen can load from Control Profiles?"), exportRow(opts.offer, "Save as layout", opts.suggest)) : null;
+  modal([h("h2", {}, "Backups of your SC bindings"),
+    h("p", {}, `Every time Star Citizen saves its bindings, Stick Citizen keeps a copy (the last ${data.keep} automatic ones). ` +
+      "Restore turns a backup into a layout you pick in SC. Your live bindings file is never changed."),
+    data.live ? h("div", { class: "bk-live" }, h("span", {}, "WATCHING"), h("code", {}, data.live))
+      : h("div", { class: "bk-msg bad" }, "Couldn't find Star Citizen's actionmaps.xml. Open it once with the folder button so Stick Citizen can back it up."),
+    h("div", { class: "row left" }, h("button", { class: "btn go", disabled: !data.live || null, onclick: async () => {
+      const r = await API.backup_now();
+      backupsFlow(r.ok ? { msg: r.msg, offer: r.backup, suggest: r.suggest } : { msg: r.msg, bad: true });
+    } }, "Save my current config")),
+    msg, offer,
+    h("div", { class: "bk-list" }, rows.length ? rows : h("div", { class: "sub" }, "No backups yet.")),
+    h("div", { class: "row" }, h("button", { class: "btn", onclick: closeModal }, "Close"))]);
+  $("#modal .mbox").classList.add("wide");
+}
+
 function wire() {
+  $("#btnBackups").onclick = () => backupsFlow();
   $("#btnLayouts").onclick = layoutsFlow;
   document.querySelectorAll("#views button").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
   $("#btnSave").onclick = async () => apply(await API.save_layout());
