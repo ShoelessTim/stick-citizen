@@ -196,6 +196,9 @@ class Api:
         if path:
             self._load(path)
         self._sync_slots(force=True)
+        self._live_stamp = None        # (path, mtime, size) of the live actionmaps.xml last backed up
+        self._live_check = time.time()
+        self._backup_tick()            # on launch: back up SC's bindings if they changed since last time
 
     # ----- internals -----
     def _load(self, path):
@@ -408,7 +411,97 @@ class Api:
             out["captured"], self._captured = self._captured, None
         if self._fix is not None and self._fix_done():
             out["fixit"] = self._fixit_finish()
+        if now - self._live_check > self.BACKUP_EVERY:
+            self._live_check = now
+            b = self._backup_tick()
+            if b:
+                out["backup"] = f"Star Citizen saved new bindings: backed up ({b['backup']['binds']} binds)"
         return out
+
+    # ----- backups of SC's live bindings (read only; restores go out as exported layouts) -----
+    BACKUP_EVERY = 3.0      # seconds between checks of actionmaps.xml while running
+
+    def _live_path(self):
+        """SC's live actionmaps.xml: the loaded file if it is one, else the one the app last used, else search."""
+        for p in (self._path, self._cfg.get("actionmaps_path")):
+            if p and self._is_live(p) and Path(p).is_file():
+                return str(p)
+        return find_actionmaps()
+
+    def _backup_tick(self):
+        """Back up the live file if it changed since the last look. Returns the snapshot if a new copy was made."""
+        from . import backups
+        live = self._live_path()
+        if not live:
+            return None
+        try:
+            st = os.stat(live)
+        except OSError:
+            return None
+        stamp = (live, st.st_mtime, st.st_size)
+        if stamp == self._live_stamp:
+            return None
+        r = backups.snapshot(live)
+        if r["ok"]:                    # half-written files are retried on the next check
+            self._live_stamp = stamp
+        return r if r["created"] else None
+
+    def backup_list(self):
+        from . import backups
+        live = self._live_path()
+        d = mappings_dir(live) if live else None
+        return {"live": live or "", "channel": backups.channel_of(live) if live else "", "items": backups.list_backups(),
+                "keep": backups.KEEP, "folder": str(backups.backups_dir()), "mappings": str(d) if d else ""}
+
+    def backup_now(self):
+        """"Save my current config": a kept (never pruned) copy of SC's live bindings right now."""
+        from . import backups
+        live = self._live_path()
+        if not live:
+            return {"ok": False, "msg": "Couldn't find Star Citizen's actionmaps.xml. Open it once with the folder button "
+                                        "(…\\StarCitizen\\LIVE\\user\\client\\0\\Profiles\\default) so Stick Citizen knows where it is."}
+        r = backups.snapshot(live, saved=True)
+        if not r["ok"]:
+            return {"ok": False, "msg": r["msg"]}
+        b = r["backup"]
+        msg = (f"Saved a copy of your {b['channel']} bindings ({b['binds']} binds)" if r["created"]
+               else f"Already backed up ({b['when']}), now kept for good")
+        return {"ok": True, "msg": msg, "backup": b, "suggest": "MyBinds-" + time.strftime("%Y-%m-%d")}
+
+    def backup_export(self, backup_id, name="", path=None):
+        """Restore a backup: write it out as an exported layout in SC's controls\\mappings (never actionmaps.xml).
+        The bindings loaded in Stick Citizen are left as they are."""
+        from . import backups
+        f = backups.get(backup_id)
+        if not f:
+            return {"ok": False, "msg": "That backup is gone"}
+        b = backups.info(f)
+        name = (name or "").strip() or "Restored-" + b["when"][:16].replace(" ", "-").replace(":", "")
+        safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in name).strip("-") or "Restored"
+        if not path:
+            live = self._live_path()
+            d = mappings_dir(live) if live else None
+            if d:
+                d.mkdir(parents=True, exist_ok=True)
+                path, n = d / f"layout_{safe}_exported.xml", 1
+                while path.exists():
+                    n += 1
+                    path = d / f"layout_{safe}-{n}_exported.xml"
+            else:
+                path = self._dialog("save", ("Star Citizen layout (*.xml)",), f"layout_{safe}_exported.xml")
+        if not path:
+            return {"ok": False, "msg": "Couldn't find SC's controls\\mappings folder. Open your actionmaps.xml once with the folder button."}
+        if self._is_live(path):
+            return {"ok": False, "msg": "That's Star Citizen's own bindings file. Restores only go out as a new layout file."}
+        profile = Path(path).stem.removeprefix("layout_").removesuffix("_exported")
+        try:
+            xml = backups.to_layout_xml(f.read_bytes(), profile, f"Stick Citizen backup of {b['channel']} bindings, {b['when']}")
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "msg": f"Couldn't read that backup: {e}"}
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(xml, encoding="utf-8")
+        return {"ok": True, "path": str(path), "profile": profile,
+                "msg": f"Saved as “{profile}”. In Star Citizen: Options → Keybindings → Control Profiles → “{profile}”"}
 
     # ----- Fix it: "this control does nothing in SC" -----
     FIX_WAIT = 6.0      # seconds to wait for a press before saying the stick sent nothing

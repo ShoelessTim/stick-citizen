@@ -24,7 +24,8 @@ The exe isn't code-signed, so Windows SmartScreen may warn the first time. Click
 5. **Edit** to drag actions onto controls. Each control has a **base** row and a **⇧ shift** row.
 6. **Fly** opens a ring course with your bindings so you can feel them without launching the game.
 7. **Fix it: a control does nothing?** Click it in the bar and press the dead control. Four checks light green or red, each with one line on what to do: did the stick send anything, does SC have an action on it, is the bind on your other stick (SC's js1/js2 the other way round), and is it the wrong mode, shift layer or mini-stick mode. The bind problems get a **Fix in layout** button that saves a layout file to import in SC. **Scan whole layout** (in the same panel) checks every bind at once, no pressing needed: binds sitting on the wrong stick, binds on a number your stick never sends, actions filed under the wrong category or missing from SC's action list, two actions firing on one input, and spare controls with nothing on them.
-8. **Save for Star Citizen** writes a layout file into SC's `controls\mappings` folder. In SC: Options → Keybindings → Control Profiles → pick it.
+8. **Backups** (the clock button): Stick Citizen keeps a dated copy of SC's bindings every time SC saves them, so a crash that resets your binds doesn't cost you anything. **Save my current config** keeps a copy for good and can also save it as a layout. **Restore** turns any backup into a layout you pick in SC under Options → Keybindings → Control Profiles.
+9. **Save for Star Citizen** writes a layout file into SC's `controls\mappings` folder. In SC: Options → Keybindings → Control Profiles → pick it.
 
 Stick Citizen never edits SC's live `actionmaps.xml` (SC overwrites it anyway). The **Mode** chips (Flight, Mining, Salvage, Turret, On foot, Ground) filter to one kind of play. Your setup lives in `%APPDATA%\StickCitizen`, so updating never loses it.
 
