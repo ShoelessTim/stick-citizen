@@ -23,7 +23,8 @@ The exe isn't code-signed, so Windows SmartScreen may warn the first time. Click
 4. **Press anything** and its label lights up with the action it does in SC, shown big and spoken.
 5. **Edit** to drag actions onto controls. Each control has a **base** row and a **⇧ shift** row.
 6. **Fly** opens a ring course with your bindings so you can feel them without launching the game.
-7. **Save for Star Citizen** writes a layout file into SC's `controls\mappings` folder. In SC: Options → Keybindings → Control Profiles → pick it.
+7. **Fix it: a control does nothing?** Click it in the bar and press the dead control. Four checks light green or red, each with one line on what to do: did the stick send anything, does SC have an action on it, is the bind on your other stick (SC's js1/js2 the other way round), and is it the wrong mode, shift layer or mini-stick mode. The bind problems get a **Fix in layout** button that saves a layout file to import in SC.
+8. **Save for Star Citizen** writes a layout file into SC's `controls\mappings` folder. In SC: Options → Keybindings → Control Profiles → pick it.
 
 Stick Citizen never edits SC's live `actionmaps.xml` (SC overwrites it anyway). The **Mode** chips (Flight, Mining, Salvage, Turret, On foot, Ground) filter to one kind of play. Your setup lives in `%APPDATA%\StickCitizen`, so updating never loses it.
 
@@ -38,7 +39,7 @@ On foot, Sublight walks with the left mini-stick in hat mode (like a controller'
 ## Where it's going
 
 **Next up**
-- A "how do I unbreak my layout" fix-it tool: press anything and see what the stick sent, what SC does with it, and a plain-English diagnosis.
+- Fix it, part 2: scan your whole layout with the same checks, not just one control at a time.
 - A mini-stick mode indicator (mouse / hat / analog).
 - More starting layouts, with their creators' permission.
 

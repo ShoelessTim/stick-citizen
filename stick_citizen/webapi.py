@@ -21,7 +21,7 @@ from .actionmaps import INVERT_OPTION, find_actionmaps, load_profile
 from .bindings import ACTIVATION_MODES, BindingSet, Bound, load_catalog, mappings_dir
 from .callouts import spoken
 from .paths import backup_dir, fresh_start, migrate_legacy, user_dir
-from .templates import CARDINALS, POV_KEY, bind_key, fix_pov_hats, key_of, load_template, other_inputs, parse_key, short_label
+from .templates import CARDINALS, POV_KEY, bind_key, fix_pov_hats, key_of, load_template, other_inputs, parse_key, short_label  # noqa: F401
 
 MODES = [("all", "All"), ("flight", "Flight"), ("mining", "Mining"), ("salvage", "Salvage"),
          ("turret", "Turret"), ("foot", "On foot"), ("ground", "Ground")]
@@ -188,6 +188,9 @@ class Api:
         self._last_reload_check = 0.0
         self._window = None
         self._speaker = None
+        self._match = {}               # SC js instance -> how it was paired with a connected stick
+        self._fix = None               # Fix it: listening for one press (raw events only)
+        self._fix_result = None        # last Fix it result, kept for "Fix in layout"
         path = actionmaps if actionmaps is not None else (self._cfg.get("actionmaps_path") or find_actionmaps())
         if path:
             self._load(path)
@@ -212,6 +215,8 @@ class Api:
         overrides = {int(k): v for k, v in self._cfg.get("slot_devices", {}).items()}
         free = list(devices)
         slots = {}
+        match = {}                                               # inst -> "manual" | "product" | "order"
+        bases = [v.split("{")[0].strip().lower() for v in wanted.values()]
 
         def take(pred):
             d = next((d for d in free if pred(d)), None)
@@ -222,14 +227,19 @@ class Api:
         for inst in instances:                                   # 1. manual choice, 2. product name
             o = overrides.get(inst)
             d = take(lambda d, o=o: o and d["name"] == o)
+            how = "manual"
             if not d and wanted.get(inst):
                 base = wanted[inst].split("{")[0].strip().lower()
                 d = take(lambda d, b=base: b and b in d["name"].lower())
+                how = "product" if bases.count(base) == 1 else "order"   # two sticks, one name: still a guess
             if d:
                 slots[inst] = d
+                match[inst] = how
         for inst in instances:                                   # 3. whatever is left, in order
             if inst not in slots and free:
                 slots[inst] = free.pop(0)
+                match[inst] = "order"
+        self._match = match
         n = max(instances) if instances else 0
         for d in free:                                           # extra sticks get new instances
             n += 1
@@ -347,6 +357,8 @@ class Api:
             if slot is None:
                 continue
             events.append({"slot": slot, "key": key, "on": on})
+            if self._fix is not None:
+                self._fix_feed(slot, key, on)
             if self._capture is not None and self._capture_want == "button" and self._capture in (0, slot):
                 if on:
                     if not self._capture_keys:
@@ -392,7 +404,104 @@ class Api:
                "reload": reload}
         if self._captured:
             out["captured"], self._captured = self._captured, None
+        if self._fix is not None and self._fix_done():
+            out["fixit"] = self._fixit_finish()
         return out
+
+    # ----- Fix it: "this control does nothing in SC" -----
+    FIX_WAIT = 6.0      # seconds to wait for a press before saying the stick sent nothing
+    FIX_HOLD = 1.5      # a press is done when everything is released, or after this long
+
+    def fixit_arm(self, mode="flight"):
+        """Listen for the next press. poll() returns `fixit` (the four checks) when it's done."""
+        self._fix = {"t0": time.time(), "first": None, "events": [], "down": set(), "mouse": False, "mode": mode or "flight"}
+        return {"ok": True, "wait": self.FIX_WAIT}
+
+    def fixit_mouse(self):
+        """The page saw the mouse pointer move while Fix it was listening (a mini-stick in Mouse mode)."""
+        if self._fix is not None:
+            self._fix["mouse"] = True
+        return {"ok": True}
+
+    def fixit_cancel(self):
+        self._fix = None
+        return {"ok": True}
+
+    def _fix_feed(self, slot, key, on):
+        f = self._fix
+        f["events"].append((slot, key, on))
+        if on:
+            f["first"] = f["first"] or time.time()
+            f["down"].add((slot, key))
+        else:
+            f["down"].discard((slot, key))
+
+    def _fix_done(self):
+        f, now = self._fix, time.time()
+        if f["first"]:
+            return not f["down"] or now - f["first"] > self.FIX_HOLD
+        return now - f["t0"] >= self.FIX_WAIT
+
+    def _fixit_finish(self):
+        from . import fixit
+        f, self._fix = self._fix, None
+        devices = self._hub.snapshot()[0]
+        raw = fixit.raw_readout(f["events"], mouse_moved=f["mouse"], devices=len(devices))
+        slot = raw["slot"]
+        controls, twins = {}, []
+        if slot is not None:
+            t = self._tpl(slot)
+            for k in raw["keys"]:
+                c, layer = t.control_for(k)
+                if c:
+                    controls[k] = (self.input_name(slot, c.inputs.get("base", k)).rstrip(" ⇧"), layer, dict(c.inputs))
+                    twins += [v for lay, v in c.inputs.items() if lay != layer]
+        sc = fixit.sc_readout(self._bset, slot, raw["keys"], self._catalog, mode_of, twins)
+
+        def stick_name(inst):
+            s = self._slot(inst)
+            side = s["side"] if s else ""
+            return "left stick" if side == "L" else "right stick" if side == "R" else "other stick"
+
+        res = fixit.diagnose(raw, sc, mode=f["mode"], controls=controls, stick_name=stick_name,
+                             match=self._match.get(slot, "order"))
+        res["raw"], res["sc"] = raw, {"here": sc["here"], "elsewhere": {str(k): v for k, v in sc["elsewhere"].items()}}
+        res["control"] = self.input_name(slot, raw["keys"][0]) if raw["keys"] else ""
+        res["side"] = (self._slot(slot) or {}).get("side", "") if slot is not None else ""
+        res["mode"] = f["mode"]
+        res["note"] = fixit.freshness_note(self._path, fixit.sc_running())
+        self._fix_result = {"res": res, "elsewhere": sc["elsewhere"]}
+        return res
+
+    def fixit_fix(self, check_id, path=None):
+        """"Fix in layout" for the last Fix it result. Changes the bindings here (Undo works), then saves an
+        exported layout XML to import in SC. Never touches SC's live actionmaps.xml."""
+        last = self._fix_result
+        if not last:
+            return {"ok": False, "msg": "Run Fix it first"}
+        res = last["res"]
+        slot, keys = res["slot"], res["keys"]
+        if check_id == "wrong_stick":
+            if not last["elsewhere"]:
+                return {"ok": False, "msg": "Nothing to move"}
+            inst, hits = next(iter(last["elsewhere"].items()))
+            moved = 0
+            for k, binds in hits.items():
+                for b in binds:
+                    act = self._bset.at(bind_key(inst, k))
+                    old = next((x for x in act if x.map == b["map"] and x.action == b["action"]), None)
+                    self._bset.assign(bind_key(slot, k), b["map"], b["action"], old.activation if old else b["activation"])
+                    moved += 1
+            last["elsewhere"] = {}
+            saved = self.save_layout(path)
+            if not saved.get("ok"):
+                return {**self._ok(f"Moved {moved} bind{'s' if moved != 1 else ''} to this stick. Save for Star Citizen when you're ready."), "ok": True}
+            return {**saved, "msg": f"Moved {moved} bind{'s' if moved != 1 else ''} to this stick. " + saved["msg"]}
+        if check_id == "bound":
+            if not any(self._bset.at(bind_key(slot, k)) for k in keys):
+                return {"ok": False, "msg": "Pick an action for it first"}
+            return self.save_layout(path)
+        return {"ok": False, "msg": "That check has no layout fix"}
 
     @staticmethod
     def _image_path(t):
@@ -694,11 +803,18 @@ class Api:
         path = path or self._dialog("save", ("Star Citizen layout (*.xml)",), f"layout_{safe}_exported.xml")
         if not path:
             return {"ok": False}
+        if self._is_live(path):          # SC's own file: edits only go out as a layout the user imports
+            return {"ok": False, "msg": "That's Star Citizen's own bindings file. Save as a new layout file instead (in controls\\mappings)."}
         profile = Path(path).stem.removeprefix("layout_").removesuffix("_exported")
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(self._bset.to_xml(profile), encoding="utf-8")
         self._bset.dirty = False
         return self._ok(f"Saved. In Star Citizen: Options → Keybindings → Control Profiles → “{profile}”")
+
+    @staticmethod
+    def _is_live(path):
+        """SC's live bindings file (any channel). Stick Citizen never writes it."""
+        return Path(path).name.lower() == "actionmaps.xml"
 
     def fly_test(self):
         tmp = Path(tempfile.gettempdir()) / "stick_citizen_flytest.xml"

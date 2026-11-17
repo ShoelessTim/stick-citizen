@@ -14,6 +14,8 @@
   --dim: #8a9bb0;
   --faint: #4c5968;
   --steel: #5f7d96;
+  --ok: #4fe3a0;
+  --bad: #ff6b6b;
   --r: 4px;
   --ease: cubic-bezier(.2, .8, .2, 1);
   --display: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
@@ -266,3 +268,34 @@ main { flex: 1; position: relative; min-height: 0; }
 .lay span { color: var(--dim); font-size: 13px; }
 .lay i { font-style: normal; font: 600 10px var(--mono); letter-spacing: .08em; color: var(--steel); text-transform: uppercase; }
 .lay small { color: #8a7a5c; font-size: 11px; }
+
+/* ----- Fix it panel (inside the sticks view) ----- */
+.chip.fix { border-color: rgba(255,181,71,.55); color: var(--amber-soft); }
+.chip.fix:hover, .chip.fix.on { background: rgba(255,181,71,.12); border-color: var(--amber); color: var(--text); }
+.fixit { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); width: 560px; max-width: calc(100% - 32px); max-height: calc(100% - 20px); overflow: auto;
+  z-index: 15; background: #0a1019; border: 1px solid rgba(255,181,71,.45); border-radius: 10px; box-shadow: 0 14px 40px rgba(0,0,0,.6); padding: 14px 16px 12px; animation: rise .2s var(--ease); }
+.fx-head { display: flex; align-items: baseline; gap: 10px; }
+.fx-head .tag { font: 700 11px var(--mono); letter-spacing: .16em; color: var(--bg); background: var(--amber); padding: 3px 7px; border-radius: 4px; }
+.fx-head h2 { margin: 0; font: 600 17px var(--display); flex: 1; }
+.fx-head .icon { width: 30px; height: 30px; align-self: center; }
+.fx-wait { display: flex; align-items: center; gap: 10px; margin: 12px 0 4px; color: var(--dim); font-size: 13px; }
+.fx-wait i { width: 10px; height: 10px; border-radius: 50%; background: var(--amber); animation: pulseA 1.2s ease-out infinite; }
+.fx-read { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 10px 0 8px; font-size: 12px; }
+.fx-read span { font: 700 10px var(--mono); letter-spacing: .14em; color: var(--steel); padding-top: 2px; }
+.fx-read b { font: 600 13px var(--mono); color: var(--cyan-soft); font-weight: 600; }
+.fx-read b.none { color: var(--faint); }
+.fx-rows { display: flex; flex-direction: column; gap: 6px; }
+.fx-row { display: grid; grid-template-columns: 14px 1fr auto; gap: 4px 12px; align-items: start; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02); }
+.fx-row.bad { border-color: rgba(255,107,107,.35); background: rgba(255,107,107,.06); }
+.fx-light { width: 12px; height: 12px; border-radius: 50%; margin-top: 3px; background: var(--faint); }
+.fx-row.ok .fx-light { background: var(--ok); box-shadow: 0 0 8px rgba(79,227,160,.6); }
+.fx-row.bad .fx-light { background: var(--bad); box-shadow: 0 0 8px rgba(255,107,107,.6); }
+.fx-row .q { font: 700 10px var(--mono); letter-spacing: .12em; color: var(--steel); }
+.fx-row .t { font: 600 14px var(--display); margin-top: 1px; }
+.fx-row.skip .t { color: var(--faint); font-weight: 500; }
+.fx-row .f { grid-column: 2; font-size: 12.5px; color: var(--dim); }
+.fx-row.bad .f { color: #ffc9c9; }
+.fx-row .btn { grid-row: 1 / span 2; grid-column: 3; align-self: center; white-space: nowrap; padding: 6px 10px; font-size: 12px; }
+.fx-note { margin-top: 8px; font-size: 12px; color: var(--amber-soft); }
+.fx-note.quiet { color: var(--faint); }
+.fx-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
