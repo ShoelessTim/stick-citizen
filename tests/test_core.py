@@ -812,3 +812,151 @@ def test_restore_after_sc_reset_brings_back_old_binds(tmp_path, monkeypatch):
 def test_backup_without_sc_install(tmp_path, monkeypatch):
     api, _hub = _api(tmp_path, monkeypatch)                  # demo file isn't SC's live actionmaps.xml
     assert api.backup_list()["live"] == "" and api.backup_now()["ok"] is False
+
+
+# ---------------------------------------------------------------- Setup helper (v3.11.0)
+STARTUP = [("spaceship_power", "v_power_toggle"), ("spaceship_power", "v_power_toggle_thrusters"),
+           ("spaceship_general", "v_flightready"), ("spaceship_movement", "v_toggle_landing_system"),
+           ("seat_general", "v_toggle_quantum_mode")]
+
+
+def _rows(pairs, use=""):
+    return [{"map": m, "action": a, "use": use} for m, a in pairs]
+
+
+def _slot(api, side):
+    return next(s["slot"] for s in api.get_state()["sticks"] if s["side"] == side)
+
+
+def test_reach_table_covers_every_builtin_control():
+    import json
+    from stick_citizen import helper
+    reach, use = helper.load_data()
+    starters = Path(__file__).parent.parent / "stick_citizen" / "data" / "starters"
+    for f in starters.glob("*.json"):
+        for c in json.loads(f.read_text(encoding="utf-8"))["controls"]:
+            e = reach["controls"].get(c["id"])
+            assert e, f"{f.name}: {c['id']} has no reach rank"
+            assert 1 <= e["rank"] <= 10 and e["zone"] in ("thumb", "index", "pinky", "base")
+            assert ("centering" in e) == (c.get("kind") == "axis"), c["id"]
+    assert set(reach["weights"]["use_targets"]) == set(helper.USES)
+    assert all(v in helper.USES for v in use["use"].values())
+
+
+def test_helper_keeps_startup_sequence_on_one_hat_and_changes_nothing(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    left = _slot(api, "L")
+    before = api._bset.to_xml()
+    st = api.helper_start()
+    assert [r["action"] for r in st["presets"][0]["rows"]] == [a for _m, a in STARTUP]
+    plan = api.helper_suggest(left, _rows(STARTUP), True)
+    assert plan["ok"] and plan["together"]
+    assert {p["group"] for p in plan["placements"]} == {plan["together"]}
+    assert [p["dir"] for p in plan["placements"]] == ["up", "right", "down", "left", "push"]   # in sequence order
+    assert [p["use"] for p in plan["placements"]][:3] == ["rare"] * 3                       # guessed from action_use.json
+    assert any("not set up yet" in n for n in plan["notes"])                                # left mini-stick skipped
+    assert api._bset.to_xml() == before and not api._bset.dirty                              # a suggestion changes nothing
+
+
+def test_helper_spread_puts_rare_on_base_and_often_on_thumb(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    right = _slot(api, "R")
+    rows = _rows(STARTUP[:3], "rare") + [{"map": "spaceship_missiles", "action": "v_weapon_launch_missile", "use": "often"}]
+    plan = api.helper_suggest(right, rows, False)
+    zones = {p["action"]: p["zone"] for p in plan["placements"]}
+    assert not plan["together"]
+    assert [zones[a] for _m, a in STARTUP[:3]] == ["base"] * 3
+    assert zones["v_weapon_launch_missile"] in ("thumb", "index")
+
+
+def test_helper_prefers_free_controls_and_shows_what_it_displaces():
+    from stick_citizen import helper
+    reach, _ = helper.load_data()
+    ctl = [{"id": "base-f1", "name": "Base F1", "group": "", "dir": "", "key": "b27", "axis": False},
+           {"id": "base-f2", "name": "Base F2", "group": "", "dir": "", "key": "b28", "axis": False}]
+    taken = {"b27": [{"map": "spaceship_general", "action": "v_toggle_all_doors", "label": "Doors"}]}
+    mode_of = __import__("stick_citizen.webapi", fromlist=["mode_of"]).mode_of
+    plan = helper.suggest(_rows(STARTUP[:1], "rare"), ctl, lambda k: taken.get(k, []), reach=reach, mode_of=mode_of)
+    assert plan["placements"][0]["cid"] == "base-f2" and plan["placements"][0]["free"]
+    plan = helper.suggest(_rows(STARTUP[:1], "rare"), ctl[:1], lambda k: taken.get(k, []), reach=reach, mode_of=mode_of)
+    assert [d["action"] for d in plan["placements"][0]["displaces"]] == ["v_toggle_all_doors"]
+    # an on-foot bind on the same input is kept, not displaced (flight + on foot on one input is fine)
+    taken = {"b27": [{"map": "player", "action": "jump", "label": "Jump"}]}
+    p = helper.suggest(_rows(STARTUP[:1], "rare"), ctl[:1], lambda k: taken.get(k, []), reach=reach, mode_of=mode_of)["placements"][0]
+    assert not p["displaces"] and [k["action"] for k in p["keeps"]] == ["jump"] and not p["free"]
+
+
+def test_helper_long_sequence_and_axis_rows(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    right = _slot(api, "R")
+    six = STARTUP + [("spaceship_general", "v_toggle_all_doors")]
+    plan = api.helper_suggest(right, _rows(six), True)
+    assert not plan["together"] and len(plan["placements"]) == 6 and any("No hat has 6" in n for n in plan["notes"])
+    assert len({p["key"] for p in plan["placements"]}) == 6
+    plan = api.helper_suggest(right, _rows(STARTUP[:2]) + [{"map": "spaceship_movement", "action": "v_strafe_lateral"}], True)
+    ax = next(p for p in plan["placements"] if p["action"] == "v_strafe_lateral")
+    assert ax["key"].startswith("a") and plan["together"]                 # the axis goes to an axis, the buttons stay on a hat
+
+
+def test_helper_accept_is_one_undo_and_only_goes_out_as_export(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    right = _slot(api, "R")
+    live = tmp_path / "LIVE" / "user" / "client" / "0" / "Profiles" / "default" / "actionmaps.xml"
+    live.parent.mkdir(parents=True)
+    live.write_text(DEMO.read_text())
+    stamp = (live.read_bytes(), live.stat().st_mtime)
+    before = api._bset.to_xml()
+    plan = api.helper_suggest(right, _rows(STARTUP), True)
+    skip = plan["placements"][-1]["i"]
+    res = api.helper_accept([skip])
+    assert res["ok"] and res["placed"] == 4 and api._bset.dirty
+    for p in plan["placements"][:-1]:
+        assert any(b.action == p["action"] for b in api._bset.at((right, *__import__("stick_citizen.templates", fromlist=["parse_key"]).parse_key(p["key"]))))
+    assert api._bset.where("seat_general", "v_toggle_quantum_mode") is None             # unticked: not placed
+    assert api.helper_accept()["ok"] is False                                          # used up
+    out = tmp_path / "layout_Startup_exported.xml"
+    assert api.save_layout(str(out))["ok"] and "v_flightready" in out.read_text()
+    assert api.save_layout(str(live))["ok"] is False                                   # never the live file
+    assert (live.read_bytes(), live.stat().st_mtime) == stamp
+    api.undo()
+    assert api._bset.to_xml() == before                                                # one Undo puts it all back
+
+
+def test_helper_refuses_a_stale_plan(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    right = _slot(api, "R")
+    plan = api.helper_suggest(right, _rows(STARTUP[:2]), True)
+    api.assign(right, plan["placements"][0]["key"], "spaceship_general", "v_toggle_all_doors")
+    res = api.helper_accept()
+    assert res["ok"] is False and "Suggest again" in res["msg"]
+
+
+def test_axis_check_vertical_lift(tmp_path, monkeypatch):
+    from stick_citizen.bindings import Bound
+    api, _hub = _api(tmp_path, monkeypatch)
+    left, right = _slot(api, "L"), _slot(api, "R")
+    assert api.helper_checks()["findings"] == []                         # demo: lift on the right twist (spring)
+    assert "VKBDevCfg" in api.helper_checks()["note"]
+    lift = api._bset.where("spaceship_movement", "v_strafe_vertical")
+    api._bset.remove(lift, "spaceship_movement", "v_strafe_vertical")
+    f = api.helper_checks()["findings"]
+    assert [x["id"] for x in f] == ["vertical_lift:none"] and f[0]["level"] == "warn"
+    api._bset.binds.setdefault((right, "axis", 2, ""), []).append(Bound("spaceship_movement", "v_strafe_vertical"))   # a2 = wheel T1
+    f = api.helper_checks()["findings"]
+    assert f and f[0]["level"] == "bad" and "Wheel T1" in f[0]["title"]
+    api._bset.binds[(right, "axis", 2, "")].pop()
+    api._bset.binds.setdefault((left, "axis", 1, ""), []).append(Bound("spaceship_movement", "v_strafe_vertical"))   # left Y
+    assert api.helper_checks()["findings"] == []                         # spring-centred stick: fine
+    r = api.helper_set_kind(left, "omni")
+    assert r["ok"] and r["checks"]["findings"][0]["level"] == "bad" and "Omni" in r["checks"]["findings"][0]["fix"]
+    assert api._cfg["stick_kinds"]["L"] == "omni"
+    assert api.helper_set_kind(left, "other")["checks"]["findings"] == []   # a throttle quadrant can hold lift absolute
+    assert api.helper_set_kind(left, "bogus")["ok"] is False
+
+
+def test_axis_checks_are_an_extensible_list():
+    from stick_citizen import helper
+    reach, _ = helper.load_data()
+    extra = lambda ctx: [{"id": "x", "level": "warn", "title": "custom", "fix": ""}]   # noqa: E731
+    res = helper.axis_checks({}, [], [], reach=reach, checks=helper.AXIS_CHECKS + [extra])
+    assert [f["id"] for f in res["findings"]] == ["vertical_lift:none", "x"]
