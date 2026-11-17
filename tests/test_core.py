@@ -767,6 +767,24 @@ def test_backup_prunes_to_last_20_automatic_keeps_saved(tmp_path, monkeypatch):
     assert not any("js2_button30\"" in backups.get(b["id"]).read_text() for b in autos)
 
 
+def test_backup_back_to_old_content_is_kept_as_newest(tmp_path, monkeypatch):
+    """Binds go back to an older state, then SC resets them: that older state must survive pruning."""
+    from stick_citizen import backups
+    live = _live_sc(tmp_path)
+    monkeypatch.setenv("STICK_CITIZEN_HOME", str(tmp_path / "home"))
+    good = DEMO.read_text()
+    backups.snapshot(live, now=1_700_000_000)
+    for i in range(19):
+        live.write_text(good.replace("js2_button6", f"js2_button{30 + i}"))
+        backups.snapshot(live, now=1_700_000_010 + i)
+    live.write_text(good)                                    # back to the first state
+    r = backups.snapshot(live, now=1_700_000_100)
+    assert r["created"] and len(backups.list_backups()) == 20
+    live.write_text(good.replace("js2_button6", "js2_button99"))   # then SC resets / changes again
+    backups.snapshot(live, now=1_700_000_200)
+    assert any(backups.get(b["id"]).read_text() == good for b in backups.list_backups())
+
+
 def test_save_my_config_and_restore_as_export_never_writes_live(tmp_path, monkeypatch):
     from stick_citizen.actionmaps import load_profile as lp
     live = _live_sc(tmp_path, DEMO.read_text().replace(
