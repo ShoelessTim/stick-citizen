@@ -1,0 +1,43 @@
+{
+ "_how": [
+  "Setup helper: how often an action gets used, as a starting guess. You can change it per action in the helper.",
+  "often = several times a minute (thumb hats, trigger, red button); sometimes = a few times a flight; rare = once a flight (base buttons).",
+  "Keys are SC action names. Anything not listed starts as sometimes.",
+  "presets: ready-made sequences the helper offers (map, action), in order."
+ ],
+ "use": {
+  "v_power_toggle": "rare",
+  "v_power_toggle_thrusters": "rare",
+  "v_power_set_thrusters_on": "rare",
+  "v_flightready": "rare",
+  "v_toggle_landing_system": "sometimes",
+  "v_deploy_landing_system": "sometimes",
+  "v_retract_landing_system": "sometimes",
+  "v_toggle_quantum_mode": "sometimes",
+  "v_toggle_qdrive_engagement": "sometimes",
+  "v_atc_request": "rare",
+  "v_toggle_all_doors": "rare",
+  "v_toggle_all_doorlocks": "rare",
+  "v_lights": "rare",
+  "v_emergency_exit": "rare",
+  "v_eject": "rare",
+  "v_weapon_launch_missile": "often",
+  "v_target_lock_selected": "often",
+  "v_target_cycle_hostile_fwd": "often",
+  "v_target_cycle_hostile_back": "often",
+  "v_attack1_group1": "often",
+  "v_afterburner": "often",
+  "v_space_brake": "often",
+  "v_ifcs_vector_decoupling_toggle": "often",
+  "v_power_throttle_up": "often",
+  "v_power_throttle_down": "often",
+  "v_toggle_mining_mode": "rare",
+  "v_toggle_salvage_mode": "rare"
+ },
+ "presets": [
+  {"id": "startup", "name": "Ship start-up",
+   "actions": [["spaceship_power", "v_power_toggle"], ["spaceship_power", "v_power_toggle_thrusters"],
+               ["spaceship_general", "v_flightready"], ["spaceship_movement", "v_toggle_landing_system"],
+               ["seat_general", "v_toggle_quantum_mode"]]}
+ ]
+}
