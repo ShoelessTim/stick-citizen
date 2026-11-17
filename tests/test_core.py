@@ -466,3 +466,112 @@ def test_sublight_axes_and_on_foot(tmp_path, monkeypatch):
     assert mini_push and swap and all(k != mini_push for k in swap) and not api._bset.at(mini_push)
     api.apply_layout("blank")
     assert "invert" not in api._bset.to_xml("T")
+
+
+# ---------------------------------------------------------------- Fix it
+def _fix(api, hub, uid=None, key=None, mouse=False, mode="flight"):
+    """One Fix it run: press `key` on stick `uid` (or nothing) and return the result poll() hands back."""
+    api.FIX_WAIT = 0 if key is None else api.FIX_WAIT
+    api.fixit_arm(mode)
+    if mouse:
+        api.fixit_mouse()
+    if key:
+        hub.press(uid, key)
+        hub.press(uid, key, False)
+    res = api.poll().get("fixit")
+    assert res, "Fix it should finish once the press is released (or nothing came)"
+    return res, {c["id"]: c for c in res["checks"]}
+
+
+def test_fixit_stick_sent_nothing(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    _res, c = _fix(api, hub)
+    assert c["sent"]["ok"] is False and "HidHide" in c["sent"]["fix"]
+    assert c["bound"]["ok"] is None and c["wrong_stick"]["ok"] is None     # nothing to check yet
+    api2, hub2 = _api(tmp_path, monkeypatch, devices=[])
+    _res, c = _fix(api2, hub2)
+    assert c["sent"]["ok"] is False and "can't see any sticks" in c["sent"]["title"]
+
+
+def test_fixit_mini_stick_in_mouse_mode(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    _res, c = _fix(api, hub, mouse=True)
+    assert c["sent"]["ok"] is True and c["mode"]["ok"] is False and "Hat mode" in c["mode"]["fix"]
+
+
+def test_fixit_bound_and_working(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    res, c = _fix(api, hub, "u2", "b6")                     # demo: js2 button 6 = landing gear (flight)
+    assert res["raw"]["keys"] == ["b6"] and res["slot"] == 2
+    assert res["sc"]["here"]["b6"][0]["action"] == "v_toggle_landing_system"
+    assert [c[k]["ok"] for k in ("sent", "bound", "wrong_stick", "mode")] == [True, True, True, True]
+
+
+def test_fixit_not_bound_anywhere(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    _res, c = _fix(api, hub, "u2", "b77")
+    assert c["bound"]["ok"] is False and c["bound"]["can_fix"]
+    assert c["wrong_stick"]["ok"] is True and not c["wrong_stick"]["can_fix"]
+    assert api.fixit_fix("bound", str(tmp_path / "layout_X_exported.xml"))["ok"] is False   # pick an action first
+    api.assign(2, "b77", "spaceship_general", "v_toggle_all_doors")
+    out = tmp_path / "layout_Fixed_exported.xml"
+    assert api.fixit_fix("bound", str(out))["ok"] and 'input="js2_button77"' in out.read_text()
+
+
+def test_fixit_wrong_stick_moves_bind_into_exported_layout(tmp_path, monkeypatch):
+    from stick_citizen.actionmaps import load_profile as lp
+    live = DEMO.read_bytes()
+    api, hub = _api(tmp_path, monkeypatch)
+    _res, c = _fix(api, hub, "u1", "b6")                    # js1 b6: nothing here, landing gear sits on js2 b6
+    assert c["bound"]["ok"] is False
+    assert c["wrong_stick"]["ok"] is False and c["wrong_stick"]["can_fix"] and "js2" in c["wrong_stick"]["title"]
+    assert "plug-in order" in c["wrong_stick"]["fix"]       # demo file names both sticks "vJoy": a guess
+    out = tmp_path / "mappings" / "layout_FixIt_exported.xml"
+    res = api.fixit_fix("wrong_stick", str(out))
+    assert res["ok"] and "Moved 1 bind" in res["msg"]
+    again = lp(out)
+    assert again.lookup((1, "button", 6, ""))[0].action == "v_toggle_landing_system"
+    assert again.lookup((2, "button", 6, "")) == []
+    assert DEMO.read_bytes() == live                         # SC's live file is never written
+    api.undo()
+    assert api._bset.where("spaceship_general", "v_toggle_landing_system") == (2, "button", 6, "")
+
+
+def test_fixit_bound_only_on_foot(tmp_path, monkeypatch):
+    from stick_citizen.webapi import mode_of
+    api, hub = _api(tmp_path, monkeypatch)
+    foot = next(a for a in api._catalog.actions if mode_of(a["map"]) == "foot" and not a["axis"])
+    api.assign(2, "b70", foot["map"], foot["action"])
+    _res, c = _fix(api, hub, "u2", "b70")
+    assert c["bound"]["ok"] is True and c["mode"]["ok"] is False and "On foot" in c["mode"]["title"]
+    _res, c = _fix(api, hub, "u2", "b70", mode="foot")      # in the on-foot mode it's fine
+    assert c["mode"]["ok"] is True
+
+
+def test_fixit_shift_layer_on(tmp_path, monkeypatch):
+    api, hub = _api(tmp_path, monkeypatch)
+    cid = api.map_control(2, "b90", "Test button")["control"]
+    api.map_control(2, "b91", "", "", "", cid)              # its shift-layer number
+    api.assign(2, "b90", "spaceship_general", "v_toggle_all_doors")
+    _res, c = _fix(api, hub, "u2", "b91")
+    assert c["mode"]["ok"] is False and c["mode"]["title"] == "Shift layer was on"
+    api.remove(2, "b90", "spaceship_general", "v_toggle_all_doors")
+    api.assign(2, "b91", "spaceship_general", "v_toggle_all_doors")
+    _res, c = _fix(api, hub, "u2", "b90")
+    assert c["mode"]["ok"] is False and "⇧ layer" in c["mode"]["title"]
+
+
+def test_never_writes_live_actionmaps(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    live = tmp_path / "LIVE" / "actionmaps.xml"
+    res = api.save_layout(str(live))
+    assert res["ok"] is False and not live.exists()
+
+
+def test_fixit_freshness_note(tmp_path):
+    from stick_citizen.fixit import freshness_note
+    f = tmp_path / "actionmaps.xml"
+    f.write_text("<ActionMaps/>")
+    assert "restart SC" in freshness_note(str(f), running=True)
+    assert "saved just now" in freshness_note(str(f), running=False)
+    assert "No SC bindings" in freshness_note(None, running=False)

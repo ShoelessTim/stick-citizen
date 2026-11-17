@@ -63,6 +63,22 @@ def build(workdir: Path, learned=True):
                 if ids.get(cid) and api._catalog.get(m, a):
                     api.assign(slot, ids[cid], m, a)
             api.assign(slot, "b60", "spaceship_missiles", "v_weapon_launch_missile")
+    fixes = {}
+    if learned:   # real Fix it results from the real Api: js1/js2 mix-up, on-foot-only bind, mini-stick in mouse mode
+        def run(uid=None, key=None, mouse=False):
+            api.FIX_WAIT = 0 if key is None else 6.0
+            api.fixit_arm("flight")
+            if mouse:
+                api.fixit_mouse()
+            if key:
+                hub.press(uid, key)
+                hub.press(uid, key, False)
+            return api.poll()["fixit"]
+        fixes["wrong"] = run("L", "b6")                  # demo file: landing gear is on js2 b6 (the other stick)
+        api.assign(by_side["R"], "b70", "player", "jump")
+        fixes["foot"] = run("R", "b70")
+        fixes["mouse"] = run(mouse=True)
+        api.undo()
     hub.press("R", "b120")
     api.poll()
     state = api.get_state()
@@ -71,6 +87,7 @@ def build(workdir: Path, learned=True):
     api.apply_layout("sublight")
     state = api.get_state()
     state["layouts"] = api.list_layouts()
+    state["fixes"] = fixes
     return state, images, search
 
 
@@ -91,6 +108,8 @@ window.MOCK_API = (() => {
     save_layout: () => ok("Saved"), fly_test: () => ok("Ring course launched"), say: () => Promise.resolve({}),
     set_speech: () => Promise.resolve({ ok: true }),
     list_layouts: () => Promise.resolve(F.layouts), apply_layout: () => ok("Applied"),
+    fixit_arm: () => Promise.resolve({ ok: true, wait: 6 }), fixit_mouse: () => Promise.resolve({ ok: true }),
+    fixit_cancel: () => Promise.resolve({ ok: true }), fixit_fix: () => ok("Moved 1 bind to this stick. Saved."),
   };
 })();
 """
@@ -103,7 +122,7 @@ def write_site(state, images, search, site: Path):
     shutil.copytree(web, site)
     axes = {s["slot"]: [0.35, -0.2, 0, 0, 0, 0.1] for s in state["sticks"]}
     (site / "fixture.js").write_text("window.FIXTURE = " + json.dumps(
-        {"state": state, "images": images, "search": search, "axes": axes, "layouts": state.pop("layouts")}) + ";\n" + MOCK, encoding="utf-8")
+        {"state": state, "images": images, "search": search, "axes": axes, "layouts": state.pop("layouts"), "fixes": state.pop("fixes")}) + ";\n" + MOCK, encoding="utf-8")
     html = (site / "index.html").read_text(encoding="utf-8")
     (site / "index.html").write_text(html.replace('<script src="app.js', '<script src="fixture.js"></script>\n<script src="app.js'), encoding="utf-8")
 
@@ -150,6 +169,10 @@ def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
             snap("3-right-shift", "window.__events.push({slot:%s,key:'b1',on:false},{slot:%s,key:'b60',on:true})" % (r, r))
             snap("4-edit-drawer", "setView('edit'); openDrawer(%s, 'Main trigger')" % r)
             snap("5-layouts", "closeDrawer(); setView('sticks'); S.stick='both'; render(); layoutsFlow()", 700)
+            snap("6-fixit-listening", "closeModal(); fixitFlow()", 600)
+            snap("7-fixit-wrong-stick", "fixGot(FIXTURE.fixes.wrong)")
+            snap("8-fixit-on-foot-only", "fixGot(FIXTURE.fixes.foot)")
+            snap("9-fixit-mouse-mode", "fixGot(FIXTURE.fixes.mouse)")
         b.close()
     return shots, errors
 

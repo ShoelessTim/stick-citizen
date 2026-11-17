@@ -435,8 +435,9 @@ function searchBox(stick, key) {
   }
   async function pick(a) {
     S.sel.adding = null;
-    apply(await API.assign(stick.slot, key, a.map, a.action));
+    await apply(await API.assign(stick.slot, key, a.map, a.action));
     renderDrawer();
+    if (S.fixSave) { S.fixSave = false; apply(await API.fixit_fix("bound")); }     // Fix it: save the layout file now
   }
   input.addEventListener("input", () => { kb = 0; run(); });
   input.addEventListener("keydown", (e) => {
@@ -796,12 +797,89 @@ function startDrag(e, stick, g, dot) {
   dot.addEventListener("pointerup", up);
 }
 
+/* ---------------- Fix it: "this control does nothing in SC" ----------------
+   Press the dead control; four checks come back from Python, each a green or red light and one line on
+   what to do. The two readouts stay separate: what the stick sent (raw) and what SC does with it. */
+const FIX_Q = { sent: "1 · DID THE STICK SEND IT?", bound: "2 · DOES SC HAVE AN ACTION ON IT?", wrong_stick: "3 · ON THE CORRECT STICK (JS1 / JS2)?", mode: "4 · CORRECT MODE, SHIFT LAYER, MINI-STICK MODE?" };
+const modeName = (id) => (id === "general" ? "any mode" : ((S.state.modes.find((m) => m.id === id) || {}).label || id).toLowerCase());
+
+function fixMouse(e) {
+  if (S.fix && S.fix.state === "wait" && !S.fix.mouse && Math.abs(e.movementX) + Math.abs(e.movementY) > 2) { S.fix.mouse = true; API.fixit_mouse(); }
+}
+
+async function fixitFlow() {
+  closeDrawer();
+  const r = await API.fixit_arm(S.mode);
+  S.fix = { state: "wait", until: Date.now() + 1000 * ((r && r.wait) || 6), mouse: false };
+  window.addEventListener("mousemove", fixMouse);
+  renderFix();
+}
+
+function fixClose() {
+  if (S.fix && S.fix.state === "wait") API.fixit_cancel();
+  S.fix = null; S.fixSave = false;
+  window.removeEventListener("mousemove", fixMouse);
+  renderFix();
+}
+
+function fixGot(res) {
+  window.removeEventListener("mousemove", fixMouse);
+  S.fix = { state: "done", res };
+  renderFix();
+}
+
+async function fixApply(check, res) {
+  if (check.id === "wrong_stick") { apply(await API.fixit_fix("wrong_stick")); return; }
+  // not bound: pick an action in the drawer; the layout file is saved right after
+  const stick = stickBySlot(res.slot);
+  const key = res.keys[0];
+  const c = stick && stick.controls.find((x) => Object.values(x.inputs).includes(key));
+  S.fixSave = true;
+  S.stick = res.slot;
+  openDrawer(res.slot, c ? (c.group || "#" + c.id) : "@" + key, key);
+  setTimeout(() => { const i = $("#drawer .search input"); i && i.focus(); }, 0);
+}
+
+function renderFix() {
+  const box = $("#fixit");
+  $("#btnFix") && $("#btnFix").classList.toggle("on", !!S.fix);
+  if (!S.fix) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = "";
+  const close = h("button", { class: "icon", "aria-label": "Close Fix it", onclick: fixClose, html: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>' });
+  if (S.fix.state === "wait") {
+    const left = Math.max(0, Math.ceil((S.fix.until - Date.now()) / 1000));
+    box.append(h("div", { class: "fx-head" }, h("span", { class: "tag" }, "FIX IT"), h("h2", {}, "Press the control that does nothing"), close),
+      h("div", { class: "fx-wait" }, h("i"), `Listening… press it once and let go (${left} s)`));
+    return;
+  }
+  const res = S.fix.res;
+  const side = res.side === "L" ? "left stick" : res.side === "R" ? "right stick" : res.slot ? "js" + res.slot : "";
+  box.append(h("div", { class: "fx-head" }, h("span", { class: "tag" }, "FIX IT"),
+    h("h2", {}, res.control ? `${res.control} · ${side}` : "No button press came in"), close));
+  // the two readouts, side by side but separate
+  const acts = Object.values(res.sc.here || {}).flat();
+  box.append(h("div", { class: "fx-read" },
+    h("span", {}, "STICK SENT"), res.raw.keys.length ? h("b", {}, res.raw.keys.map(shortKey).join("  ")) : h("b", { class: "none" }, res.raw.mouse_moved ? "mouse movement only" : "nothing"),
+    h("span", {}, "SC DOES"), acts.length ? h("b", {}, acts.map((a) => `${a.label} (${modeName(a.mode)})`).join(" · ")) : h("b", { class: "none" }, "nothing")));
+  box.append(h("div", { class: "fx-rows" }, res.checks.map((c) => h("div", { class: "fx-row " + (c.ok === true ? "ok" : c.ok === false ? "bad" : "skip") },
+    h("i", { class: "fx-light", "aria-label": c.ok === true ? "OK" : c.ok === false ? "Problem" : "Not checked" }),
+    h("div", {}, h("div", { class: "q" }, FIX_Q[c.id]), h("div", { class: "t" }, c.title)),
+    c.can_fix ? h("button", { class: "btn go", onclick: () => fixApply(c, res) }, c.id === "bound" ? "Fix in layout…" : "Fix in layout") : null,
+    c.fix ? h("div", { class: "f" }, c.fix) : null))));
+  if (res.note) box.append(h("div", { class: "fx-note" + (/running/.test(res.note) ? "" : " quiet") }, res.note));
+  box.append(h("div", { class: "fx-btns" }, h("button", { class: "btn", onclick: fixClose }, "Close"),
+    h("button", { class: "btn go", onclick: fixitFlow }, "Try another control")));
+}
+
 /* ---------------- live input ---------------- */
 async function pollLoop() {
   for (;;) {
     try {
       const r = await API.poll();
       if (r.captured && S.capture) { const f = S.capture; S.capture = null; f(r.captured); }
+      if (r.fixit) fixGot(r.fixit);
+      else if (S.fix && S.fix.state === "wait") renderFix();
       let dirty = false;
       for (const ev of r.events) {
         const set = S.live[ev.slot] || (S.live[ev.slot] = new Set());
@@ -915,8 +993,12 @@ function wire() {
     if (e.target.tagName === "INPUT") return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); apply(await API.undo()); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); apply(await API.save_layout()); }
-    if (e.key === "Escape") { if (!$("#modal").hidden) closeModal(); else closeDrawer(); }
+    if (e.key === "Escape") { if (!$("#modal").hidden) closeModal(); else if (S.sel) closeDrawer(); else if (S.fix) fixClose(); }
   });
+  // Fix it lives in the sticks view: a button in the bar opens its panel over the stage
+  const fixBtn = h("button", { class: "chip fix", id: "btnFix", title: "A control does nothing in Star Citizen? Press it and see why.",
+    onclick: () => (S.fix ? fixClose() : fixitFlow()) }, "Fix it: a control does nothing");
+  $(".bar").insertBefore(fixBtn, $("#hint"));
   // edit mode gets a "Map a control" button in the bar
   const mapBtn = h("button", { class: "chip", id: "btnMap", style: "border-style:dashed;color:var(--cyan-soft)", onclick: () => mapFlow() }, "+ Map a control");
   $(".bar").insertBefore(mapBtn, $("#hint"));
@@ -929,7 +1011,11 @@ function wire() {
   const copyBtn = h("button", { class: "chip", id: "btnCopyMaps", onclick: copyMaps }, "Copy stick maps");
   $(".bar").insertBefore(copyBtn, $("#hint"));
   copyBtn.hidden = true;
-  const obs = new MutationObserver(() => { mapBtn.hidden = copyBtn.hidden = resetBtn.hidden = S.view !== "edit"; });
+  const obs = new MutationObserver(() => {
+    mapBtn.hidden = copyBtn.hidden = resetBtn.hidden = S.view !== "edit";
+    fixBtn.hidden = S.view === "edit";
+    if (S.view === "edit" && S.fix) fixClose();
+  });
   obs.observe($("#app"), { attributes: true, attributeFilter: ["class"] });
   mapBtn.hidden = true;
 }
