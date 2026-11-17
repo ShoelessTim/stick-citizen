@@ -3,7 +3,7 @@
 Runs the real Api with fake VKB sticks (built-in profiles), writes a browser copy of the screen
 whose window.MOCK_API replays that state, and screenshots it with Playwright:
   0-*  a brand-new user: built-in profile, nothing learned yet, and the setup walkthrough
-  1-*  after setup: learned buttons and some bindings, live presses, shift, edit drawer
+  1-*  after setup: learned buttons and some bindings, live presses, shift, edit drawer, Fix it (press + scan)
 
   python tools/preview.py --out shots/
 """
@@ -79,6 +79,15 @@ def build(workdir: Path, learned=True):
         fixes["foot"] = run("R", "b70")
         fixes["mouse"] = run(mouse=True)
         api.undo()
+        # slice 2: the whole-layout scan on the same state (demo file + a bind on a number the left stick never sends)
+        # and two actions on one right-stick input; the left mini-stick fully learned (so its H1 binds are firm findings)
+        api.assign_input(by_side["L"], "mini-stick-a2-up", "base", "b99")
+        api.assign(by_side["L"], "b100", "spaceship_targeting_advanced", "v_target_cycle_hostile_back")
+        from stick_citizen.bindings import Bound
+        api._bset.binds.setdefault((by_side["R"], "button", 29, ""), []).append(Bound("spaceship_general", "v_toggle_all_doors"))
+        fixes["scan"] = api.fixit_scan()
+        api._bset.binds[(by_side["R"], "button", 29, "")].pop()
+        api.undo()
     hub.press("R", "b120")
     api.poll()
     state = api.get_state()
@@ -110,6 +119,7 @@ window.MOCK_API = (() => {
     list_layouts: () => Promise.resolve(F.layouts), apply_layout: () => ok("Applied"),
     fixit_arm: () => Promise.resolve({ ok: true, wait: 6 }), fixit_mouse: () => Promise.resolve({ ok: true }),
     fixit_cancel: () => Promise.resolve({ ok: true }), fixit_fix: () => ok("Moved 1 bind to this stick. Saved."),
+    fixit_scan: () => Promise.resolve(F.fixes.scan), fixit_scan_fix: () => ok("Moved 1 bind to js2. Saved."),
   };
 })();
 """
@@ -173,6 +183,8 @@ def shoot(site: Path, out: Path, size=(1600, 940), fresh=False):
             snap("7-fixit-wrong-stick", "fixGot(FIXTURE.fixes.wrong)")
             snap("8-fixit-on-foot-only", "fixGot(FIXTURE.fixes.foot)")
             snap("9-fixit-mouse-mode", "fixGot(FIXTURE.fixes.mouse)")
+            snap("10-fixit-scan", "fixitScan()", 600)
+            snap("11-fixit-scan-spare", "document.querySelector('.fixit').scrollTop = 1e6; document.querySelector('.fx-spare').open = true; setTimeout(() => { document.querySelector('.fixit').scrollTop = document.querySelector('.fx-spare').offsetTop - 20; }, 50)", 600)
         b.close()
     return shots, errors
 

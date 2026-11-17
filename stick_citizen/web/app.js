@@ -437,7 +437,11 @@ function searchBox(stick, key) {
     S.sel.adding = null;
     await apply(await API.assign(stick.slot, key, a.map, a.action));
     renderDrawer();
-    if (S.fixSave) { S.fixSave = false; apply(await API.fixit_fix("bound")); }     // Fix it: save the layout file now
+    if (S.fixSave) {                                                              // Fix it: save the layout file now
+      const fid = S.fixSave; S.fixSave = false;
+      apply(await (fid === true ? API.fixit_fix("bound") : API.fixit_scan_fix(fid)));
+      if (fid !== true && S.fix && S.fix.state === "scan") fixitScan();                // scan: refresh the list
+    }
   }
   input.addEventListener("input", () => { kb = 0; run(); });
   input.addEventListener("keydown", (e) => {
@@ -828,6 +832,70 @@ function fixGot(res) {
   renderFix();
 }
 
+/* Slice 2: scan the whole layout with the same checks (no press). Findings come back from Python already
+   in plain English, worst first; spare controls (nothing bound) fold away at the bottom. */
+const SCAN_Q = { bound: "NOT BOUND", wrong_stick: "WRONG STICK (JS1 / JS2)", mode: "WRONG CATEGORY", conflict: "TWO ACTIONS ON ONE INPUT", dead: "THE STICK NEVER SENDS IT" };
+
+async function fixitScan() {
+  if (S.fix && S.fix.state === "wait") API.fixit_cancel();
+  window.removeEventListener("mousemove", fixMouse);
+  const spare = !!(S.fix && S.fix.spare);
+  const res = await API.fixit_scan();
+  S.fix = { state: "scan", res, spare };
+  renderFix();
+}
+
+function fixGroupFor(slot, key) {
+  const stick = stickBySlot(slot);
+  const c = stick && stick.controls.find((x) => Object.values(x.inputs).includes(key));
+  return c ? (c.group || "#" + c.id) : "@" + key;
+}
+
+async function fixScanApply(f) {
+  if (f.check === "wrong_stick") { apply(await API.fixit_scan_fix(f.id)); fixitScan(); return; }
+  // not bound: pick an action in the drawer; the layout file is saved right after
+  S.fixSave = f.id;
+  S.stick = f.slot;
+  openDrawer(f.slot, fixGroupFor(f.slot, f.key), f.key);
+  setTimeout(() => { const i = $("#drawer .search input"); i && i.focus(); }, 0);
+}
+
+function fixScanRow(f) {
+  const show = !f.can_fix && stickBySlot(f.slot);
+  return h("div", { class: "fx-row " + (f.level === "info" ? "info" : f.level) },
+    h("i", { class: "fx-light", "aria-label": f.level === "bad" ? "Problem" : f.level === "warn" ? "Check this" : "Spare" }),
+    h("div", {}, h("div", { class: "q" }, `${SCAN_Q[f.check]} · ${f.where.stick.toUpperCase()}`), h("div", { class: "t" }, f.title)),
+    f.can_fix ? h("button", { class: "btn go", onclick: () => fixScanApply(f) }, f.check === "bound" ? "Fix in layout…" : "Fix in layout")
+      : show ? h("button", { class: "btn", onclick: () => { S.stick = f.slot; openDrawer(f.slot, fixGroupFor(f.slot, f.key)); } }, "Show") : null,
+    f.fix ? h("div", { class: "f" }, f.fix) : null);
+}
+
+function renderScan(box, close) {
+  const res = S.fix.res, sm = res.summary;
+  const main = res.findings.filter((f) => f.level !== "info"), spare = res.findings.filter((f) => f.level === "info");
+  const n = sm.bad + sm.warn;
+  box.append(h("div", { class: "fx-head" }, h("span", { class: "tag" }, "FIX IT"),
+    h("h2", {}, n ? `Whole layout · ${n} thing${n === 1 ? "" : "s"} to fix` : "Whole layout · no problems found"), close));
+  box.append(h("div", { class: "fx-read" },
+    h("span", {}, "SCANNED"), h("b", {}, `${sm.binds} bind${sm.binds === 1 ? "" : "s"} on ${sm.sticks} stick${sm.sticks === 1 ? "" : "s"}`),
+    h("span", {}, "FOUND"), n ? h("b", {}, `${sm.bad} problem${sm.bad === 1 ? "" : "s"} · ${sm.warn} to check`) : h("b", { class: "none" }, "nothing wrong")));
+  const rows = main.map(fixScanRow);
+  if (!main.length) rows.push(h("div", { class: "fx-row ok" }, h("i", { class: "fx-light", "aria-label": "OK" }),
+    h("div", {}, h("div", { class: "q" }, "WHOLE LAYOUT"), h("div", { class: "t" }, "Every bind is on an input your sticks send, in the right category, with no clashes")),
+    h("div", { class: "f" }, "If a control still does nothing, press it in Fix it.")));
+  box.append(h("div", { class: "fx-rows" }, rows));
+  if (spare.length) {
+    const d = h("details", { class: "fx-spare", open: S.fix.spare || null, ontoggle: () => { S.fix.spare = d.open; } },
+      h("summary", {}, `${spare.length} control${spare.length === 1 ? " has" : "s have"} no action (spare buttons are fine)`),
+      h("div", { class: "fx-rows" }, spare.map(fixScanRow)));
+    box.append(d);
+  }
+  for (const note of [sm.guess, sm.unplugged, res.note]) if (note) box.append(h("div", { class: "fx-note" + (note === res.note && !/running/.test(note) ? " quiet" : "") }, note));
+  box.append(h("div", { class: "fx-btns" }, h("button", { class: "btn", onclick: fixClose }, "Close"),
+    h("button", { class: "btn", onclick: fixitScan }, "Scan again"),
+    h("button", { class: "btn go", onclick: fixitFlow }, "Press a control instead")));
+}
+
 async function fixApply(check, res) {
   if (check.id === "wrong_stick") { apply(await API.fixit_fix("wrong_stick")); return; }
   // not bound: pick an action in the drawer; the layout file is saved right after
@@ -850,9 +918,11 @@ function renderFix() {
   if (S.fix.state === "wait") {
     const left = Math.max(0, Math.ceil((S.fix.until - Date.now()) / 1000));
     box.append(h("div", { class: "fx-head" }, h("span", { class: "tag" }, "FIX IT"), h("h2", {}, "Press the control that does nothing"), close),
-      h("div", { class: "fx-wait" }, h("i"), `Listening… press it once and let go (${left} s)`));
+      h("div", { class: "fx-wait" }, h("i"), `Listening… press it once and let go (${left} s)`),
+      h("div", { class: "fx-btns" }, h("button", { class: "btn", onclick: fixitScan }, "Or scan the whole layout")));
     return;
   }
+  if (S.fix.state === "scan") { renderScan(box, close); return; }
   const res = S.fix.res;
   const side = res.side === "L" ? "left stick" : res.side === "R" ? "right stick" : res.slot ? "js" + res.slot : "";
   box.append(h("div", { class: "fx-head" }, h("span", { class: "tag" }, "FIX IT"),
@@ -869,6 +939,7 @@ function renderFix() {
     c.fix ? h("div", { class: "f" }, c.fix) : null))));
   if (res.note) box.append(h("div", { class: "fx-note" + (/running/.test(res.note) ? "" : " quiet") }, res.note));
   box.append(h("div", { class: "fx-btns" }, h("button", { class: "btn", onclick: fixClose }, "Close"),
+    h("button", { class: "btn", onclick: fixitScan }, "Scan whole layout"),
     h("button", { class: "btn go", onclick: fixitFlow }, "Try another control")));
 }
 

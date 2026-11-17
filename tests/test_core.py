@@ -575,3 +575,129 @@ def test_fixit_freshness_note(tmp_path):
     assert "restart SC" in freshness_note(str(f), running=True)
     assert "saved just now" in freshness_note(str(f), running=False)
     assert "No SC bindings" in freshness_note(None, running=False)
+
+
+# ---------------------------------------------------------------- Fix it, slice 2: whole-layout scan
+def _scan(api):
+    res = api.fixit_scan()
+    return res, {f["id"]: f for f in res["findings"]}
+
+
+def _learn_all(api, slot, start=60):
+    """What the Set up walkthrough leaves behind: every control on the stick map has an input."""
+    st = next(s for s in api.get_state()["sticks"] if s["slot"] == slot)
+    for i, cid in enumerate(st["unassigned"]):
+        api.assign_input(slot, cid, "base", f"b{start + i}")
+
+
+def test_scan_two_actions_on_one_input(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    _res, f = _scan(api)
+    c = f["conflict:2:b8"]                                   # demo: doors and door locks both on js2 b8
+    assert c["level"] == "warn" and "both fire" in c["title"] and not c["can_fix"]
+    assert {a["action"] for a in c["acts"]} == {"v_toggle_all_doors", "v_toggle_all_doorlocks"}
+    api.set_activation(2, "b8", "spaceship_general", "v_toggle_all_doorlocks", "hold")   # tap vs hold: not a clash
+    _res, f = _scan(api)
+    assert "conflict:2:b8" not in f
+
+
+def test_scan_flight_and_on_foot_on_one_input_is_fine(tmp_path, monkeypatch):
+    """Sublight puts flight and on-foot actions on the left mini-stick on purpose: different modes, no clash."""
+    api, _hub = _api(tmp_path, monkeypatch)
+    l = next(s for s in api.get_state()["sticks"] if s["side"] == "L")
+    api.learn(l["slot"], "mini-stick-a2-up", ["h1u"])
+    api.apply_layout("sublight")
+    _res, f = _scan(api)
+    assert not [x for x in f.values() if x["check"] == "conflict" and x["slot"] == l["slot"] and x["key"].startswith("h1")]
+
+
+def test_scan_wrong_category_and_unknown_action(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    _res, f = _scan(api)
+    brake = f["mode:2:b3:spaceship_movement:v_brake"]       # demo: v_brake filed under spaceship flight; SC has it for ground
+    assert brake["level"] == "bad" and "vehicle_driver" in brake["fix"]
+    old = f["mode:1:b1:spaceship_weapons:v_attack1_group1"]  # an old action name SC's list doesn't have
+    assert old["level"] == "warn" and "renamed or removed" in old["fix"]
+    assert "mode:2:b6:spaceship_general:v_toggle_landing_system" in f
+    api.remove(2, "b6", "spaceship_general", "v_toggle_landing_system")      # bound again from the list: fine
+    api.assign(2, "b6", "spaceship_movement", "v_toggle_landing_system")
+    _res, f = _scan(api)
+    assert not [x for x in f.values() if x["check"] == "mode" and x["key"] == "b6"]
+
+
+def test_scan_wrong_stick_moves_bind_into_exported_layout(tmp_path, monkeypatch):
+    from stick_citizen.actionmaps import load_profile as lp
+    live = DEMO.read_bytes()
+    api, _hub = _api(tmp_path, monkeypatch)
+    l, r = (next(s for s in api.get_state()["sticks"] if s["side"] == x)["slot"] for x in "LR")
+    _res, f = _scan(api)
+    # demo: js1 (left) H1 right, but the left stick still has controls to learn: only a "check this"
+    assert f[f"dead:{l}:h1r"]["level"] == "warn" and "Run Set up" in f[f"dead:{l}:h1r"]["fix"]
+    _learn_all(api, l)
+    res, f = _scan(api)
+    w = f[f"wrong_stick:{l}:h1r"]                            # every left control learned, none sends H1: only the right stick does
+    assert w["level"] == "bad" and w["can_fix"] and w["to"] == r and "plug-in order" in w["fix"]
+    assert res["findings"][0]["id"] == w["id"]               # worst first
+    out = tmp_path / "mappings" / "layout_Scan_exported.xml"
+    done = api.fixit_scan_fix(w["id"], str(out))
+    assert done["ok"] and "Moved 1 bind" in done["msg"]
+    again = lp(out)
+    assert again.lookup((r, "hat", 1, "right"))[0].action == "v_target_cycle_hostile_fwd"
+    assert again.lookup((l, "hat", 1, "right")) == []
+    assert DEMO.read_bytes() == live                         # SC's live file is never written
+    assert api.fixit_scan_fix(w["id"], str(out))["ok"] is False      # used up: scan again
+    api.undo()
+    assert api._bset.at((l, "hat", 1, "right"))
+
+
+def test_scan_input_the_stick_never_sends(tmp_path, monkeypatch):
+    devs = [{"uid": "u1", "name": "VKBsim Gladiator EVO L", "axes": 6, "buttons": 32, "hats": 1},
+            {"uid": "u2", "name": "VKBsim Gladiator EVO R", "axes": 6, "buttons": 32, "hats": 1}]
+    api, hub = _api(tmp_path, monkeypatch, devices=devs)
+    api.assign(2, "b77", "spaceship_general", "v_toggle_all_doors")
+    from stick_citizen.bindings import Bound
+    api._bset.binds[(3, "button", 2, "")] = [Bound("spaceship_general", "v_toggle_all_doorlocks")]   # an old third stick
+    _res, f = _scan(api)
+    d = f["dead:2:b77"]
+    assert d["level"] == "bad" and "only has 32 buttons" in d["title"]
+    assert "no stick is connected as js3" in f["dead:3:b2"]["title"]
+    hub.press("u2", "b30")                                   # a number seen firing is never "never sends"
+    api.poll()
+    api.assign(2, "b30", "spaceship_general", "v_toggle_all_doors")
+    _res, f = _scan(api)
+    assert "dead:2:b30" not in f
+
+
+def test_scan_spare_controls_fix_in_layout(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    res, f = _scan(api)
+    spare = [x for x in res["findings"] if x["check"] == "bound"]
+    assert spare and all(x["level"] == "info" and x["can_fix"] for x in spare) and res["summary"]["spare"] == len(spare)
+    one = next(x for x in spare if x["slot"] == 2 and x["key"].startswith("b"))
+    out = tmp_path / "layout_Spare_exported.xml"
+    assert api.fixit_scan_fix(one["id"], str(out))["ok"] is False and not out.exists()     # pick an action first
+    api.assign(2, one["key"], "spaceship_general", "v_toggle_all_doors")
+    assert api.fixit_scan_fix(one["id"], str(out))["ok"] and f'input="js2_button{one["key"][1:]}"' in out.read_text()
+
+
+def test_scan_notes_guess_and_no_sticks(tmp_path, monkeypatch):
+    api, _hub = _api(tmp_path, monkeypatch)
+    res, _f = _scan(api)
+    assert "plug-in order" in res["summary"]["guess"]       # demo names both sticks "vJoy": js1/js2 is a guess
+    api2, _hub2 = _api(tmp_path, monkeypatch, devices=[])
+    res, f = _scan(api2)
+    assert "No sticks connected" in res["summary"]["unplugged"]
+    assert not [x for x in f.values() if x["check"] in ("dead", "wrong_stick", "bound")]
+
+
+def test_scan_readouts_stay_separate():
+    """The stick side never reads bindings and the SC side never reads sticks; scan joins them."""
+    from stick_citizen.bindings import BindingSet, Bound
+    from stick_citizen.fixit import layout_readout, scan, stick_readout
+    stick = stick_readout(1, side="R", buttons=128, hats=1, controls=[("trig", "Main trigger", {"base": "b1"})])
+    assert scan({1: stick}, {})["findings"][0]["check"] == "bound"
+    bs = BindingSet()
+    bs.binds[(1, "button", 1, "")] = [Bound("spaceship_general", "v_toggle_all_doors", "")]
+    sc = layout_readout(bs)
+    assert sc[(1, "b1")][0]["known"] == ""                   # no SC list given: category not judged
+    assert scan({1: stick}, sc)["findings"] == []
