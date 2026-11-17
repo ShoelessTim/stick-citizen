@@ -191,6 +191,7 @@ class Api:
         self._match = {}               # SC js instance -> how it was paired with a connected stick
         self._fix = None               # Fix it: listening for one press (raw events only)
         self._fix_result = None        # last Fix it result, kept for "Fix in layout"
+        self._scan_result = {}         # last whole-layout scan: finding id -> finding, for "Fix in layout"
         path = actionmaps if actionmaps is not None else (self._cfg.get("actionmaps_path") or find_actionmaps())
         if path:
             self._load(path)
@@ -252,6 +253,7 @@ class Api:
             name = d["name"] if d else (wanted.get(inst, "").split("{")[0].strip() or f"js{inst}")
             self._slots.append({"slot": inst, "uid": d["uid"] if d else None, "name": name,
                                 "connected": bool(d), "buttons": d["buttons"] if d else None,
+                                "hats": d.get("hats") if d else None,
                                 "side": stick_side(name)})
         sides = [s["side"] for s in self._slots]
         if len(self._slots) == 2 and sides[0] == sides[1]:       # unknown sides: first is left
@@ -502,6 +504,57 @@ class Api:
                 return {"ok": False, "msg": "Pick an action for it first"}
             return self.save_layout(path)
         return {"ok": False, "msg": "That check has no layout fix"}
+
+    # ----- Fix it, slice 2: scan the whole layout with the same checks -----
+    def fixit_scan(self):
+        """One-click scan of the loaded bindings against your stick maps. No press needed.
+        The stick side (what each stick can send) and the SC side (what the bindings do) are read separately."""
+        from . import fixit
+        self._sync_slots()
+        sticks = {}
+        for s in self._slots:
+            t = self._tpl(s["slot"])
+            controls = [(c.id, f"{c.group} {c.label}".strip() if c.group else c.label, dict(c.inputs)) for c in t.controls]
+            sticks[s["slot"]] = fixit.stick_readout(s["slot"], name=s["name"], side=s["side"], connected=s["connected"],
+                                                    buttons=s.get("buttons"), hats=s.get("hats"), controls=controls,
+                                                    seen=self._seen.get(s["slot"], set()))
+        sc = fixit.layout_readout(self._bset, self._catalog, mode_of)
+        res = fixit.scan(sticks, sc, match=self._match, sc_version=self._catalog.sc_version)
+        res["note"] = fixit.freshness_note(self._path, fixit.sc_running())
+        self._scan_result = {f["id"]: f for f in res["findings"]}
+        return res
+
+    def fixit_scan_fix(self, finding_id, path=None):
+        """"Fix in layout" for one scan finding (wrong stick: move the bind; not bound: save after you pick an action).
+        Undo works. Saves an exported layout XML to import in SC; never SC's live actionmaps.xml."""
+        f = self._scan_result.get(finding_id)
+        if not f:
+            return {"ok": False, "msg": "Scan again first"}
+        if f["check"] == "wrong_stick":
+            src, dst = bind_key(f["slot"], f["key"]), bind_key(f["to"], f["key"])
+            if self._bset.at(dst):
+                return {"ok": False, "msg": "That input on the other stick has a bind now. Scan again."}
+            moved = 0
+            for b in list(self._bset.at(src)):
+                self._bset.assign(dst, b.map, b.action, b.activation)
+                moved += 1
+            self._scan_result.pop(finding_id, None)
+            if not moved:
+                return {"ok": False, "msg": "Nothing to move"}
+            what = f"Moved {moved} bind{'s' if moved != 1 else ''} to js{f['to']}. "
+            saved = self.save_layout(path)
+            if not saved.get("ok"):
+                return {**self._ok(what + "Save for Star Citizen when you're ready."), "ok": True}
+            return {**saved, "msg": what + saved["msg"]}
+        if f["check"] == "bound":
+            t = self._tpl(f["slot"])
+            c = t.control(f["where"].get("cid", ""))
+            keys = list(c.inputs.values()) if c else [f["key"]]
+            if not any(self._bset.at(bind_key(f["slot"], k)) for k in keys):
+                return {"ok": False, "msg": "Pick an action for it first"}
+            self._scan_result.pop(finding_id, None)
+            return self.save_layout(path)
+        return {"ok": False, "msg": "That finding has no layout fix"}
 
     @staticmethod
     def _image_path(t):
